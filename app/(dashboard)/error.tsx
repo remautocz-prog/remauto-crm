@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ErrorScreen } from "@/components/shared/error-screen";
 
 export default function DashboardError({
@@ -9,10 +10,12 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useTranslations("errors");
+
   return (
     <ErrorScreen
-      title="Dashboard error"
-      message={error.message || "Failed to load dashboard data."}
+      title={t("dashboard")}
+      message={error.message || t("loadDashboard")}
       reset={reset}
     />
   );

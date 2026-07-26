@@ -1,5 +1,5 @@
 import { LoadingScreen } from "@/components/shared/loading-screen";
 
 export default function DashboardLoading() {
-  return <LoadingScreen message="Loading dashboard..." />;
+  return <LoadingScreen messageKey="dashboard" />;
 }

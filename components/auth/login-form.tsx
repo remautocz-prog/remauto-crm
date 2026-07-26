@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
+import { useFormatSupabaseError } from "@/lib/hooks/use-supabase-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,11 +15,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useState } from "react";
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const tAuth = useTranslations("auth");
+  const tFields = useTranslations("fields");
+  const tActions = useTranslations("actions");
+  const formatSupabaseError = useFormatSupabaseError();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +43,7 @@ export function LoginForm() {
     });
 
     if (signInError) {
-      setError(signInError.message);
+      setError(formatSupabaseError(signInError));
       setLoading(false);
       return;
     }
@@ -53,20 +59,18 @@ export function LoginForm() {
           R
         </div>
         <CardTitle className="text-2xl font-semibold text-white">
-          Welcome back
+          {tAuth("welcomeBack")}
         </CardTitle>
-        <CardDescription>
-          Sign in to your RemAuto CRM account
-        </CardDescription>
+        <CardDescription>{tAuth("signInDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{tFields("email")}</Label>
             <Input
               id="email"
               type="email"
-              placeholder="you@remauto.com"
+              placeholder={tAuth("emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -74,7 +78,7 @@ export function LoginForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{tFields("password")}</Label>
             <Input
               id="password"
               type="password"
@@ -94,10 +98,10 @@ export function LoginForm() {
             {loading ? (
               <>
                 <Loader2 className="animate-spin" />
-                Signing in...
+                {tActions("signingIn")}
               </>
             ) : (
-              "Sign in"
+              tActions("signIn")
             )}
           </Button>
         </form>

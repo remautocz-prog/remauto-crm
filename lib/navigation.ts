@@ -10,19 +10,29 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+export type NavItemKey =
+  | "dashboard"
+  | "cars"
+  | "clients"
+  | "documents"
+  | "detailing"
+  | "finance"
+  | "reports"
+  | "settings";
+
 export type NavItem = {
-  title: string;
+  key: NavItemKey;
   href: string;
   icon: LucideIcon;
 };
 
 export const navItems: NavItem[] = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Cars", href: "/cars", icon: Car },
-  { title: "Clients", href: "/clients", icon: Users },
-  { title: "Documents", href: "/documents", icon: FileText },
-  { title: "Detailing", href: "/detailing", icon: Sparkles },
-  { title: "Finance", href: "/finance", icon: Wallet },
-  { title: "Reports", href: "/reports", icon: BarChart3 },
-  { title: "Settings", href: "/settings", icon: Settings },
+  { key: "dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { key: "cars", href: "/cars", icon: Car },
+  { key: "clients", href: "/clients", icon: Users },
+  { key: "documents", href: "/documents", icon: FileText },
+  { key: "detailing", href: "/detailing", icon: Sparkles },
+  { key: "finance", href: "/finance", icon: Wallet },
+  { key: "reports", href: "/reports", icon: BarChart3 },
+  { key: "settings", href: "/settings", icon: Settings },
 ];

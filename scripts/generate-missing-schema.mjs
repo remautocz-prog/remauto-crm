@@ -8,7 +8,7 @@
  *
  * Requires .env.local with:
  *   NEXT_PUBLIC_SUPABASE_URL
- *   NEXT_PUBLIC_SUPABASE_ANON_KEY
+ *   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -263,11 +263,11 @@ async function main() {
   };
 
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!url || !key || url.includes("your-project") || key.includes("your-anon")) {
+  if (!url || !key || url.includes("your-project") || key.includes("your-publishable")) {
     console.error("Missing Supabase credentials.");
-    console.error("Create .env.local with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+    console.error("Create .env.local with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.");
     process.exit(1);
   }
 

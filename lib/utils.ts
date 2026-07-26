@@ -5,10 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency = "EUR") {
-  return new Intl.NumberFormat("en-EU", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+export {
+  formatCurrency,
+  formatNumber,
+  formatMileage,
+  formatDate,
+  formatDateTime,
+} from "@/lib/format";

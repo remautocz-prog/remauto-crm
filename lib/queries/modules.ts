@@ -1,22 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
-  Car,
   Client,
   DetailingOrder,
   DocumentTask,
   FinanceTransaction,
 } from "@/lib/types/database";
-
-export async function getCars() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("cars")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []) as Car[];
-}
 
 export async function getDocumentTasks() {
   const supabase = await createClient();

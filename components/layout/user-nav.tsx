@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { LogOut, Settings, User } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import {
   DropdownMenu,
@@ -26,6 +27,8 @@ function getInitials(email: string) {
 
 export function UserNav({ email, avatarUrl }: UserNavProps) {
   const router = useRouter();
+  const tActions = useTranslations("actions");
+  const tNav = useTranslations("nav");
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -47,23 +50,23 @@ export function UserNav({ email, avatarUrl }: UserNavProps) {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium text-white">Account</p>
+            <p className="text-sm font-medium text-white">{tActions("account")}</p>
             <p className="text-xs text-zinc-500">{email}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/settings")}>
           <User className="mr-2 h-4 w-4" />
-          Profile
+          {tActions("profile")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
-          Settings
+          {tNav("settings")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-red-500">
           <LogOut className="mr-2 h-4 w-4" />
-          Sign out
+          {tActions("signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

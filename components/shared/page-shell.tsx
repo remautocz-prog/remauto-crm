@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getTranslations } from "next-intl/server";
 
 type PageHeaderProps = {
   title: string;
@@ -32,12 +33,24 @@ type DataTableProps = {
   title: string;
   headers: string[];
   rows: string[][];
+  emptyMessage?: string;
 };
 
-export function DataTable({ title, headers, rows }: DataTableProps) {
+export async function DataTable({
+  title,
+  headers,
+  rows,
+  emptyMessage,
+}: DataTableProps) {
+  const t = await getTranslations("empty");
+
   if (rows.length === 0) {
     return (
-      <EmptyState message={`No ${title.toLowerCase()} found. Add records in Supabase or through the app.`} />
+      <EmptyState
+        message={
+          emptyMessage ?? t("default", { entity: title.toLowerCase() })
+        }
+      />
     );
   }
 

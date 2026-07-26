@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -9,6 +10,8 @@ type NotificationButtonProps = {
 };
 
 export function NotificationButton({ count = 0 }: NotificationButtonProps) {
+  const t = useTranslations("a11y");
+
   return (
     <Button variant="ghost" size="icon" className="relative">
       <Bell className="h-5 w-5" />
@@ -17,7 +20,7 @@ export function NotificationButton({ count = 0 }: NotificationButtonProps) {
           {count > 99 ? "99+" : count}
         </Badge>
       ) : null}
-      <span className="sr-only">Notifications</span>
+      <span className="sr-only">{t("notifications")}</span>
     </Button>
   );
 }

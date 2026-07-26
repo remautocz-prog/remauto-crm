@@ -1,31 +1,58 @@
 import type { Metadata } from "next";
-import { PageHeader, DataTable } from "@/components/shared/page-shell";
-import { getCars } from "@/lib/queries/modules";
+import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
+import { CarsList } from "@/components/cars/cars-list";
+import { LoadingScreen } from "@/components/shared/loading-screen";
+import { getCars, getClientOptions } from "@/lib/queries/cars";
 
-export const metadata: Metadata = {
-  title: "Cars",
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("nav");
+  return { title: t("cars") };
+}
+
+type CarsPageProps = {
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    business_model?: string;
+    sort?: string;
+  }>;
 };
 
-export default async function CarsPage() {
-  const cars = await getCars();
+async function CarsPageContent({
+  searchParams,
+}: {
+  searchParams: CarsPageProps["searchParams"];
+}) {
+  const params = await searchParams;
+  const q = params.q ?? "";
+  const status = params.status ?? "all";
+  const businessModel = params.business_model ?? "all";
+  const sort = params.sort ?? "newest";
+  const [cars, clients] = await Promise.all([
+    getCars({ q, status, business_model: businessModel, sort }),
+    getClientOptions(),
+  ]);
+  const clientNames = Object.fromEntries(clients.map((client) => [client.id, client.full_name]));
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Cars"
-        description="Manage your vehicle inventory from Supabase."
-      />
-      <DataTable
-        title="Inventory"
-        headers={["Make", "Model", "Year", "Status", "VIN"]}
-        rows={cars.map((car) => [
-          car.make,
-          car.model,
-          String(car.year),
-          car.status,
-          car.vin ?? "—",
-        ])}
-      />
-    </div>
+    <CarsList
+      cars={cars}
+      clientNames={clientNames}
+      initialQuery={q}
+      initialStatus={status}
+      initialBusinessModel={businessModel}
+      initialSort={sort}
+    />
+  );
+}
+
+export default async function CarsPage({ searchParams }: CarsPageProps) {
+  const t = await getTranslations("cars");
+
+  return (
+    <Suspense fallback={<LoadingScreen message={t("loading")} />}>
+      <CarsPageContent searchParams={searchParams} />
+    </Suspense>
   );
 }

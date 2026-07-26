@@ -1,20 +1,6 @@
-export type Car = {
-  id: number;
-  make: string;
-  model: string;
-  year: number;
-  vin: string | null;
-  status: string;
-  purchase_price: number | null;
-  sale_price: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
 export type Client = {
   id: number;
-  full_name?: string | null;
-  name?: string | null;
+  full_name: string;
   email: string | null;
   phone: string | null;
   company: string | null;
@@ -67,10 +53,13 @@ export type DashboardStats = {
   monthlyProfit: number;
 };
 
-export function getClientName(client: Client) {
-  return client.full_name ?? client.name ?? "—";
+export function getClientName(client: Client, dash = "—") {
+  return client.full_name ?? dash;
 }
 
-export function getDocumentTaskTitle(task: DocumentTask) {
-  return task.title ?? task.name ?? task.task_name ?? `Task #${task.id}`;
+export function getDocumentTaskTitle(
+  task: DocumentTask,
+  fallback: (id: number) => string
+) {
+  return task.title ?? task.name ?? task.task_name ?? fallback(task.id);
 }
