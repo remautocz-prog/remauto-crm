@@ -21,6 +21,7 @@ import { useFormatters } from "@/lib/hooks/use-formatters";
 
 type DocumentPaymentFieldsProps = {
   form: DocumentTaskFormInput;
+  totalServicePrice: number;
   onChange: <K extends keyof DocumentTaskFormInput>(
     key: K,
     value: DocumentTaskFormInput[K]
@@ -36,6 +37,7 @@ function FieldError({ message }: { message?: string }) {
 
 export function DocumentPaymentFields({
   form,
+  totalServicePrice,
   onChange,
   fieldClass,
   fieldErrors,
@@ -46,67 +48,28 @@ export function DocumentPaymentFields({
   const tValidation = useTranslations("documents.validation");
   const { formatCurrency } = useFormatters();
 
-  const servicePrice = form.service_price ?? null;
   const paidInFull = Boolean(form.paid_in_full);
-  const canPayInFull = canMarkPaidInFull(servicePrice);
+  const canPayInFull = canMarkPaidInFull(totalServicePrice);
   const effectivePaidAmount = resolveFormPaidAmount({
-    servicePrice,
+    servicePrice: totalServicePrice,
     paidAmount: form.paid_amount ?? 0,
     paidInFull,
   });
-  const outstanding = calculateOutstandingBalance(servicePrice, effectivePaidAmount);
+  const outstanding = calculateOutstandingBalance(totalServicePrice, effectivePaidAmount);
 
   function handlePaidInFullChange(checked: boolean) {
     onChange("paid_in_full", checked);
     if (checked && canPayInFull) {
-      onChange("paid_amount", Number(servicePrice));
-    }
-  }
-
-  function handleServicePriceChange(value: number | null) {
-    onChange("service_price", value);
-    if (paidInFull && canMarkPaidInFull(value)) {
-      onChange("paid_amount", Number(value));
+      onChange("paid_amount", Number(totalServicePrice));
     }
   }
 
   return (
     <div className="space-y-4 md:col-span-2">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="document_service_price">{t("servicePrice")}</Label>
-          <Input
-            id="document_service_price"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.service_price ?? ""}
-            onChange={(event) =>
-              handleServicePriceChange(
-                event.target.value === "" ? null : Number(event.target.value)
-              )
-            }
-            className={fieldClass("service_price")}
-          />
-          <FieldError message={fieldErrors.service_price} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="document_cost_price">{t("costPrice")}</Label>
-          <Input
-            id="document_cost_price"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.cost_price ?? ""}
-            onChange={(event) =>
-              onChange(
-                "cost_price",
-                event.target.value === "" ? null : Number(event.target.value)
-              )
-            }
-            className={fieldClass("cost_price")}
-          />
-          <FieldError message={fieldErrors.cost_price} />
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-sm">
+        <div className="flex justify-between gap-4">
+          <span className="text-zinc-500">{t("totalPrice")}</span>
+          <span className="font-medium text-zinc-100">{formatCurrency(totalServicePrice)}</span>
         </div>
       </div>
 

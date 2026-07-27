@@ -30,6 +30,7 @@ import { archiveDocumentTaskAction, restoreDocumentTaskAction } from "@/lib/acti
 import { AttachmentsPlaceholder } from "@/components/documents/attachments-placeholder";
 import { DocumentChecklist } from "@/components/documents/document-checklist";
 import { DocumentTaskFinancePanel } from "@/components/documents/document-task-finance-panel";
+import { DocumentTaskServicesTable } from "@/components/documents/document-task-services-table";
 import { DocumentPriorityBadge } from "@/components/documents/document-priority-badge";
 import { DocumentStatusBadge } from "@/components/documents/document-status-badge";
 import { DocumentTaskFormDialog } from "@/components/documents/document-task-form-dialog";
@@ -204,6 +205,15 @@ export function DocumentTaskDetails({
                 <p className="mt-2 whitespace-pre-wrap text-zinc-200">{task.result_notes}</p>
               </div>
             ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="border-zinc-800 bg-zinc-900/60 md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base text-white">{t("servicesTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DocumentTaskServicesTable task={task} />
           </CardContent>
         </Card>
 

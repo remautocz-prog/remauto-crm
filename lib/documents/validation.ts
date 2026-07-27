@@ -2,6 +2,7 @@ import type {
   DocumentTaskDbPayload,
   DocumentTaskFormInput,
   DocumentStatusChangeInput,
+  DocumentTaskServiceFormInput,
 } from "@/lib/types/documents";
 import {
   DEFAULT_DOCUMENT_PRIORITY,
@@ -9,14 +10,23 @@ import {
   DOCUMENT_TASK_STATUS_VALUES,
 } from "@/lib/constants/documents";
 import { normalizeChecklistForPayload } from "@/lib/documents/helpers";
-import { isKnownDocumentServiceType } from "@/lib/documents/services";
+import { buildChecklistForService } from "@/lib/documents/checklists";
 import { buildPaymentFields, canMarkPaidInFull, resolveFormPaidAmount } from "@/lib/documents/payment";
-import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
 import {
-  type DocumentVehicleMode,
-} from "@/lib/documents/vehicle";
+  calculateServiceTotals,
+  derivePrimaryServiceType,
+  normalizeServiceFormRows,
+} from "@/lib/documents/task-services";
+import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
+import { type DocumentVehicleMode } from "@/lib/documents/vehicle";
 
-export type DocumentField = keyof DocumentTaskFormInput | "confirmOverpayment" | "paid_in_full";
+export type DocumentField =
+  | keyof DocumentTaskFormInput
+  | "confirmOverpayment"
+  | "paid_in_full"
+  | `services.${number}.service_name`
+  | `services.${number}.service_price`
+  | `services.${number}.cost_price`;
 
 export type DocumentValidationMessageKey =
   | "clientRequired"
@@ -29,6 +39,10 @@ export type DocumentValidationMessageKey =
   | "servicePriceNegative"
   | "costPriceInvalid"
   | "paidInFullRequiresPrice"
+  | "atLeastOneServiceRequired"
+  | "serviceNameRequired"
+  | "serviceRowPriceNegative"
+  | "serviceRowCostNegative"
   | "statusRequired"
   | "deliveredRequiresCompleted"
   | "deliveredUnpaidWarning";
@@ -60,6 +74,23 @@ export function normalizeOptionalDate(value: string | null | undefined): string 
   return normalizeOptionalString(value);
 }
 
+function mergeChecklistsForServices(services: DocumentTaskServiceFormInput[]) {
+  const merged: ReturnType<typeof buildChecklistForService> = [];
+  const seen = new Set<string>();
+
+  for (const service of services) {
+    if (!service.service_code || service.service_code === "custom") continue;
+    for (const item of buildChecklistForService(service.service_code)) {
+      if (!seen.has(item.key)) {
+        seen.add(item.key);
+        merged.push(item);
+      }
+    }
+  }
+
+  return merged;
+}
+
 export function collectDocumentValidationIssues(
   input: DocumentTaskFormInput,
   options?: { confirmOverpayment?: boolean }
@@ -70,13 +101,41 @@ export function collectDocumentValidationIssues(
     issues.push({ field: "client_id", messageKey: "clientRequired" });
   }
 
-  if (!input.service_type || !isKnownDocumentServiceType(input.service_type)) {
-    issues.push({ field: "service_type", messageKey: "serviceTypeRequired" });
+  const services = normalizeServiceFormRows(input.services);
+  const nonEmptyServices = services.filter((service) => service.service_name.trim());
+
+  if (nonEmptyServices.length === 0) {
+    issues.push({ field: "services.0.service_name", messageKey: "atLeastOneServiceRequired" });
   }
 
-  if (input.service_type === "custom" && isBlankString(input.custom_service_name)) {
-    issues.push({ field: "custom_service_name", messageKey: "customServiceRequired" });
-  }
+  services.forEach((service, index) => {
+    const hasAnyValue =
+      service.service_name.trim() ||
+      service.service_price > 0 ||
+      service.cost_price > 0 ||
+      service.notes;
+
+    if (hasAnyValue && !service.service_name.trim()) {
+      issues.push({
+        field: `services.${index}.service_name`,
+        messageKey: "serviceNameRequired",
+      });
+    }
+
+    if (Number(service.service_price) < 0) {
+      issues.push({
+        field: `services.${index}.service_price`,
+        messageKey: "serviceRowPriceNegative",
+      });
+    }
+
+    if (Number(service.cost_price) < 0) {
+      issues.push({
+        field: `services.${index}.cost_price`,
+        messageKey: "serviceRowCostNegative",
+      });
+    }
+  });
 
   const startedAt = normalizeOptionalDate(input.started_at);
   const dueDate = normalizeOptionalDate(input.due_date);
@@ -84,31 +143,22 @@ export function collectDocumentValidationIssues(
     issues.push({ field: "due_date", messageKey: "dueDateBeforeStart" });
   }
 
-  const servicePrice = normalizeOptionalNumber(input.service_price);
-  const costPrice = normalizeOptionalNumber(input.cost_price);
+  const totals = calculateServiceTotals(nonEmptyServices);
+  const servicePrice = totals.totalServicePrice;
   const paidAmount = resolveFormPaidAmount({
     servicePrice,
     paidAmount: normalizeOptionalNumber(input.paid_amount) ?? 0,
     paidInFull: input.paid_in_full,
   });
 
-  if (input.service_price != null && servicePrice == null) {
-    issues.push({ field: "service_price", messageKey: "servicePriceInvalid" });
-  }
-  if (servicePrice != null && servicePrice < 0) {
-    issues.push({ field: "service_price", messageKey: "servicePriceNegative" });
-  }
   if (input.paid_in_full && !canMarkPaidInFull(servicePrice)) {
     issues.push({ field: "paid_in_full", messageKey: "paidInFullRequiresPrice" });
-  }
-  if (input.cost_price != null && costPrice == null) {
-    issues.push({ field: "cost_price", messageKey: "costPriceInvalid" });
   }
   if (paidAmount < 0) {
     issues.push({ field: "paid_amount", messageKey: "paidAmountNegative" });
   }
   if (
-    servicePrice != null &&
+    servicePrice > 0 &&
     paidAmount > servicePrice &&
     !options?.confirmOverpayment
   ) {
@@ -151,25 +201,22 @@ export function collectStatusChangeIssues(
   return issues;
 }
 
-function normalizeServiceType(value: DocumentTaskFormInput["service_type"]): string | null {
-  if (value === null || value === undefined) return null;
-  const trimmed = String(value).trim();
-  return trimmed === "" ? null : trimmed;
-}
-
 /** Maps form values to a Supabase-safe document_tasks payload (legacy work_type included). */
 export function mapDocumentTaskPayload(input: DocumentTaskFormInput): DocumentTaskDbPayload {
-  const servicePrice = normalizeOptionalNumber(input.service_price);
-  const costPrice = normalizeOptionalNumber(input.cost_price);
+  const services = normalizeServiceFormRows(input.services).filter((service) =>
+    service.service_name.trim()
+  );
+  const totals = calculateServiceTotals(services);
+  const servicePrice = totals.totalServicePrice;
+  const costPrice = totals.totalCostPrice;
+  const primaryService = derivePrimaryServiceType(services);
+  const serviceType = primaryService.service_type;
   const paidAmount = resolveFormPaidAmount({
     servicePrice,
     paidAmount: normalizeOptionalNumber(input.paid_amount) ?? 0,
     paidInFull: input.paid_in_full,
   });
   const documentCount = normalizeOptionalNumber(input.document_count) ?? 0;
-  const serviceType = normalizeServiceType(input.service_type);
-  const vehicleMode: DocumentVehicleMode =
-    input.vehicle_mode === "crm" ? "crm" : "external";
 
   const payment = buildPaymentFields({
     servicePrice,
@@ -178,13 +225,24 @@ export function mapDocumentTaskPayload(input: DocumentTaskFormInput): DocumentTa
     paymentMethod: input.payment_method ?? null,
   });
 
+  const mergedChecklist = mergeChecklistsForServices(services);
+  const requiredDocuments =
+    input.required_documents?.length && input.required_documents.length > 0
+      ? normalizeChecklistForPayload(input.required_documents)
+      : mergedChecklist;
+
+  const vehicleMode: DocumentVehicleMode =
+    input.vehicle_mode === "crm" ? "crm" : "external";
+
   const shared = {
     client_id: input.client_id!,
     service_type: serviceType,
     work_type: serviceType,
     custom_service_name:
       serviceType === "custom"
-        ? normalizeOptionalString(input.custom_service_name)
+        ? primaryService.custom_service_name ??
+          services[0]?.service_name.trim() ??
+          null
         : null,
     assigned_to: normalizeOptionalString(input.assigned_to ?? null),
     status: normalizeDocumentTaskStatus(input.status ?? DEFAULT_DOCUMENT_STATUS),
@@ -197,8 +255,8 @@ export function mapDocumentTaskPayload(input: DocumentTaskFormInput): DocumentTa
     payment_status: payment.payment_status,
     paid_at: payment.paid_at,
     payment_method: payment.payment_method,
-    document_count: documentCount,
-    required_documents: normalizeChecklistForPayload(input.required_documents),
+    document_count: documentCount || requiredDocuments.length,
+    required_documents: requiredDocuments,
     received_documents: normalizeChecklistForPayload(input.received_documents),
     notes: normalizeOptionalString(input.notes),
     result_notes: normalizeOptionalString(input.result_notes),
@@ -235,7 +293,13 @@ export const normalizeDocumentPayload = mapDocumentTaskPayload;
 export function focusFirstFieldError(fieldErrors: DocumentFieldErrors) {
   const firstField = Object.keys(fieldErrors)[0];
   if (!firstField) return;
-  const element = document.getElementById(`document_${firstField}`);
-  element?.scrollIntoView({ behavior: "smooth", block: "center" });
-  element?.focus({ preventScroll: true });
+  const element =
+    document.getElementById(`document_${firstField}`) ??
+    document.querySelector(`[data-field="${firstField}"]`);
+  if (element instanceof HTMLElement) {
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.focus({ preventScroll: true });
+  }
 }
+
+export { normalizeServiceFormRows };

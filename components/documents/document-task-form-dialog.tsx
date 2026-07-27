@@ -5,14 +5,20 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import type { ClientOption, Profile } from "@/lib/types/cars";
-import type { DocumentTask, DocumentTaskFormInput } from "@/lib/types/documents";
+import type { DocumentTaskWithRelations, DocumentTaskFormInput, DocumentTaskServiceFormInput } from "@/lib/types/documents";
 import {
   DEFAULT_DOCUMENT_PRIORITY,
   DEFAULT_DOCUMENT_STATUS,
   DOCUMENT_PRIORITY_VALUES,
   DOCUMENT_TASK_STATUS_VALUES,
 } from "@/lib/constants/documents";
-import { buildChecklistForService } from "@/lib/documents/checklists";
+import { DocumentTaskServicesFields } from "@/components/documents/document-task-services-fields";
+import { getDocumentFinanceSummary } from "@/lib/documents/helpers";
+import {
+  calculateServiceTotals,
+  createEmptyServiceRow,
+  servicesToFormState,
+} from "@/lib/documents/task-services";
 import {
   DEFAULT_DOCUMENT_VEHICLE_MODE,
   resolveDocumentVehicleMode,
@@ -25,9 +31,8 @@ import {
   type DocumentValidationMessageKey,
 } from "@/lib/documents/validation";
 import { DocumentPaymentFields } from "@/components/documents/document-payment-fields";
-import { DocumentServiceSelect } from "@/components/documents/document-service-select";
 import { DocumentVehicleFields } from "@/components/documents/document-vehicle-fields";
-import { inferPaidInFull } from "@/lib/documents/payment";
+import { canMarkPaidInFull, inferPaidInFull } from "@/lib/documents/payment";
 import {
   createDocumentTaskAction,
   updateDocumentTaskAction,
@@ -58,7 +63,7 @@ type DocumentTaskFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
-  task?: DocumentTask;
+  task?: DocumentTaskWithRelations;
   clients: ClientOption[];
   cars: DocumentCarOption[];
   profiles: Profile[];
@@ -67,7 +72,7 @@ type DocumentTaskFormDialogProps = {
 };
 
 function toFormState(
-  task?: DocumentTask,
+  task?: DocumentTaskWithRelations,
   initialClientId?: number | null,
   initialCarId?: number | null
 ): DocumentTaskFormInput {
@@ -76,6 +81,8 @@ function toFormState(
     : initialCarId
       ? "crm"
       : DEFAULT_DOCUMENT_VEHICLE_MODE;
+  const services = task ? servicesToFormState(task) : [createEmptyServiceRow()];
+  const finance = task ? getDocumentFinanceSummary(task) : null;
 
   return {
     client_id: task?.client_id ?? initialClientId ?? null,
@@ -88,13 +95,14 @@ function toFormState(
     vehicle_year: task?.vehicle_year ?? null,
     service_type: task?.service_type ?? task?.work_type ?? null,
     custom_service_name: task?.custom_service_name ?? "",
+    services,
     assigned_to: task?.assigned_to ?? null,
     status: task?.status ?? DEFAULT_DOCUMENT_STATUS,
     priority: task?.priority ?? DEFAULT_DOCUMENT_PRIORITY,
     started_at: task?.started_at ?? "",
     due_date: task?.due_date ?? task?.deadline ?? "",
-    service_price: task?.service_price ?? null,
-    cost_price: task?.cost_price ?? null,
+    service_price: finance?.servicePrice ?? 0,
+    cost_price: finance?.costPrice ?? 0,
     paid_amount: task?.paid_amount ?? 0,
     paid_in_full: task ? inferPaidInFull(task) : false,
     payment_method: task?.payment_method ?? null,
@@ -127,6 +135,7 @@ export function DocumentTaskFormDialog({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<DocumentFieldErrors>({});
   const [confirmOverpayment, setConfirmOverpayment] = useState(false);
+  const [orderTotals, setOrderTotals] = useState({ totalServicePrice: 0, totalCostPrice: 0 });
   const [form, setForm] = useState<DocumentTaskFormInput>(
     toFormState(task, initialClientId, initialCarId)
   );
@@ -141,12 +150,49 @@ export function DocumentTaskFormDialog({
 
   useEffect(() => {
     if (open) {
-      setForm(toFormState(task, initialClientId, initialCarId));
+      const nextForm = toFormState(task, initialClientId, initialCarId);
+      setForm(nextForm);
+      const totals = calculateServiceTotals(
+        (nextForm.services ?? []).filter((service) => service.service_name.trim())
+      );
+      setOrderTotals({
+        totalServicePrice: totals.totalServicePrice,
+        totalCostPrice: totals.totalCostPrice,
+      });
       setFieldErrors({});
       setConfirmOverpayment(false);
       setError(null);
     }
   }, [open, task, initialClientId, initialCarId]);
+
+  function updateServices(services: DocumentTaskServiceFormInput[]) {
+    const totals = calculateServiceTotals(
+      services.filter((service) => service.service_name.trim())
+    );
+    setOrderTotals({
+      totalServicePrice: totals.totalServicePrice,
+      totalCostPrice: totals.totalCostPrice,
+    });
+    setForm((prev) => {
+      const next: DocumentTaskFormInput = {
+        ...prev,
+        services,
+        service_price: totals.totalServicePrice,
+        cost_price: totals.totalCostPrice,
+      };
+      if (prev.paid_in_full && canMarkPaidInFull(totals.totalServicePrice)) {
+        next.paid_amount = totals.totalServicePrice;
+      }
+      return next;
+    });
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((key) => {
+        if (key.startsWith("services.")) delete next[key as keyof DocumentFieldErrors];
+      });
+      return next;
+    });
+  }
 
   const filteredCars = cars;
 
@@ -170,9 +216,8 @@ export function DocumentTaskFormDialog({
           next.car_id = null;
         }
       }
-      if (key === "service_type" && value && value !== "custom") {
-        next.required_documents = buildChecklistForService(String(value));
-        next.custom_service_name = "";
+      if (key === "paid_in_full" && value === true && canMarkPaidInFull(orderTotals.totalServicePrice)) {
+        next.paid_amount = orderTotals.totalServicePrice;
       }
       return next;
     });
@@ -275,30 +320,12 @@ export function DocumentTaskFormDialog({
               fieldErrors={fieldErrors}
             />
 
-            <div className="space-y-2">
-              <Label htmlFor="document_service_type">{tFields("service")} *</Label>
-              <DocumentServiceSelect
-                id="document_service_type"
-                value={form.service_type}
-                onChange={(value) => updateField("service_type", value)}
-                className={fieldClass("service_type")}
-                error={Boolean(fieldErrors.service_type)}
-              />
-              <FieldError message={fieldErrors.service_type} />
-            </div>
-
-            {form.service_type === "custom" ? (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="document_custom_service_name">{t("customServiceName")} *</Label>
-                <Input
-                  id="document_custom_service_name"
-                  value={form.custom_service_name ?? ""}
-                  onChange={(e) => updateField("custom_service_name", e.target.value)}
-                  className={fieldClass("custom_service_name")}
-                />
-                <FieldError message={fieldErrors.custom_service_name} />
-              </div>
-            ) : null}
+            <DocumentTaskServicesFields
+              services={form.services ?? [createEmptyServiceRow()]}
+              onChange={updateServices}
+              fieldErrors={fieldErrors as Partial<Record<string, string>>}
+              onTotalsChange={setOrderTotals}
+            />
 
             <div className="space-y-2">
               <Label>{tFields("manager")}</Label>
@@ -383,6 +410,7 @@ export function DocumentTaskFormDialog({
 
             <DocumentPaymentFields
               form={form}
+              totalServicePrice={orderTotals.totalServicePrice}
               onChange={updateField}
               fieldClass={fieldClass}
               fieldErrors={fieldErrors}

@@ -32,7 +32,8 @@ const TASK_SELECT = `
   *,
   clients:client_id ( id, full_name, company, phone, email, client_type ),
   cars:car_id ( id, brand, model, year, vin, registration_number, client_id ),
-  assignee:assigned_to ( id, full_name )
+  assignee:assigned_to ( id, full_name ),
+  document_task_services ( * )
 `;
 
 function mapRow(row: Record<string, unknown>): DocumentTaskWithRelations {
@@ -71,6 +72,12 @@ function matchesSearch(task: DocumentTaskWithRelations, q: string) {
   }
   if (task.vehicle_year != null && String(task.vehicle_year).includes(term)) return true;
 
+  if (task.services?.length) {
+    for (const service of task.services) {
+      if (service.service_name.toLowerCase().includes(term)) return true;
+    }
+  }
+
   const service = getTaskServiceLabel(task).toLowerCase();
   if (service.includes(term)) return true;
   if (task.custom_service_name?.toLowerCase().includes(term)) return true;
@@ -107,9 +114,11 @@ function sortTasks(tasks: DocumentTaskWithRelations[], sort?: string) {
         return new Date(aDue).getTime() - new Date(bDue).getTime();
       });
     case "highest_price":
-      return copy.sort(
-        (a, b) => Number(b.service_price ?? 0) - Number(a.service_price ?? 0)
-      );
+      return copy.sort((a, b) => {
+        const aPrice = getDocumentFinanceSummary(a).servicePrice;
+        const bPrice = getDocumentFinanceSummary(b).servicePrice;
+        return bPrice - aPrice;
+      });
     case "client_name":
       return copy.sort((a, b) => {
         const aName = a.client ? getClientDisplayName(a.client) : "";

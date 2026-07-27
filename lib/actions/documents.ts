@@ -6,19 +6,18 @@ import { getTranslations } from "next-intl/server";
 import { buildChecklistForService } from "@/lib/documents/checklists";
 import {
   buildPaymentFields,
+  canMarkPaidInFull,
   derivePaymentStatus,
 } from "@/lib/documents/payment";
-import {
-  getDocumentFinanceSummary,
-  mapDocumentTask,
-} from "@/lib/documents/helpers";
 import {
   collectDocumentValidationIssues,
   collectStatusChangeIssues,
   mapDocumentTaskPayload,
+  normalizeServiceFormRows,
   type DocumentFieldErrors,
   type DocumentValidationMessageKey,
 } from "@/lib/documents/validation";
+import { getDocumentFinanceSummary, mapDocumentTask } from "@/lib/documents/helpers";
 import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
 import { getDocumentTaskById } from "@/lib/queries/documents";
 import { createClient } from "@/lib/supabase/server";
@@ -26,6 +25,7 @@ import type {
   DocumentPaymentInput,
   DocumentStatusChangeInput,
   DocumentTaskFormInput,
+  DocumentTaskServiceFormInput,
 } from "@/lib/types/documents";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
 
@@ -90,6 +90,53 @@ function finalizeTaskPayload(
   });
 }
 
+function buildServiceRows(taskId: number, services: DocumentTaskServiceFormInput[]) {
+  return normalizeServiceFormRows(services)
+    .filter((service) => service.service_name.trim())
+    .map((service, index) => ({
+      ...(service.id ? { id: service.id } : {}),
+      document_task_id: taskId,
+      service_name: service.service_name.trim(),
+      service_price: Number(service.service_price ?? 0),
+      cost_price: Number(service.cost_price ?? 0),
+      notes: service.notes?.trim() ? service.notes.trim() : null,
+      sort_order: index,
+    }));
+}
+
+async function syncDocumentTaskServices(
+  taskId: number,
+  services: DocumentTaskServiceFormInput[],
+  existingServiceIds: string[]
+) {
+  const supabase = await createClient();
+  const rows = buildServiceRows(taskId, services);
+  const nextIds = new Set(rows.map((row) => row.id).filter(Boolean) as string[]);
+  const toDelete = existingServiceIds.filter((id) => !nextIds.has(id));
+
+  if (toDelete.length) {
+    const { error } = await supabase
+      .from("document_task_services")
+      .delete()
+      .in("id", toDelete);
+    if (error) throw error;
+  }
+
+  for (const row of rows) {
+    const { id, ...payload } = row;
+    if (id) {
+      const { error } = await supabase
+        .from("document_task_services")
+        .update(payload)
+        .eq("id", id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("document_task_services").insert(payload);
+      if (error) throw error;
+    }
+  }
+}
+
 export async function createDocumentTaskAction(
   input: DocumentTaskFormInput,
   options?: { confirmOverpayment?: boolean }
@@ -118,6 +165,21 @@ export async function createDocumentTaskAction(
   if (error) {
     console.error("[createDocumentTaskAction]", error, finalPayload);
     return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  try {
+    await syncDocumentTaskServices(data.id, input.services ?? [], []);
+  } catch (serviceError) {
+    console.error("[createDocumentTaskAction] service sync failed", serviceError);
+    await supabase.from("document_tasks").delete().eq("id", data.id);
+    const t = await getTranslations("documents");
+    return {
+      success: false,
+      error:
+        serviceError instanceof Error
+          ? serviceError.message
+          : t("serviceSaveFailed"),
+    };
   }
 
   revalidatePath("/documents");
@@ -155,6 +217,24 @@ export async function updateDocumentTaskAction(
   if (error) {
     console.error("[updateDocumentTaskAction]", error, finalPayload);
     return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  try {
+    await syncDocumentTaskServices(
+      id,
+      input.services ?? [],
+      (existing?.services ?? []).map((service) => service.id)
+    );
+  } catch (serviceError) {
+    console.error("[updateDocumentTaskAction] service sync failed", serviceError);
+    const t = await getTranslations("documents");
+    return {
+      success: false,
+      error:
+        serviceError instanceof Error
+          ? serviceError.message
+          : t("serviceSaveFailed"),
+    };
   }
 
   revalidatePath("/documents");
@@ -216,6 +296,12 @@ export async function changeDocumentStatusAction(
   if (nextStatus === "COMPLETED" || nextStatus === "DELIVERED") {
     update.completed_at = existing.completed_at ?? new Date().toISOString().slice(0, 10);
   }
+  if (nextStatus === "COMPLETED" && !existing.ready_at) {
+    update.ready_at = new Date().toISOString();
+  }
+  if (nextStatus === "DELIVERED" && !existing.delivered_at) {
+    update.delivered_at = new Date().toISOString();
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.from("document_tasks").update(update).eq("id", id);
@@ -245,9 +331,9 @@ export async function registerDocumentPaymentAction(
   }
 
   const newPaidAmount = Number(existing.paid_amount ?? 0) + Number(input.amount);
-  const servicePrice = existing.service_price;
+  const finance = getDocumentFinanceSummary(existing);
   const payment = buildPaymentFields({
-    servicePrice,
+    servicePrice: finance.servicePrice,
     paidAmount: newPaidAmount,
     paymentMethod: input.payment_method ?? existing.payment_method,
     existingPaidAt: existing.paid_at,
@@ -278,14 +364,15 @@ export async function markDocumentTaskPaidAction(id: number): Promise<ActionResu
     return { success: false, error: t("taskNotFound") };
   }
 
-  if (existing.service_price == null || Number(existing.service_price) < 0) {
+  const finance = getDocumentFinanceSummary(existing);
+  if (!canMarkPaidInFull(finance.servicePrice)) {
     const t = await getTranslations("documents");
     return { success: false, error: t("markPaidRequiresPrice") };
   }
 
   const payment = buildPaymentFields({
-    servicePrice: existing.service_price,
-    paidAmount: Number(existing.service_price),
+    servicePrice: finance.servicePrice,
+    paidAmount: finance.servicePrice,
     paidInFull: true,
     paymentMethod: existing.payment_method,
     existingPaidAt: existing.paid_at,
@@ -320,15 +407,25 @@ export async function updateDocumentTaskPaymentAction(
     return { success: false, error: t("taskNotFound") };
   }
 
+  const finance = getDocumentFinanceSummary(existing);
+
   const formLike: DocumentTaskFormInput = {
     client_id: existing.client_id,
     car_id: existing.car_id,
     vehicle_mode: existing.vehicle_mode,
     service_type: existing.service_type,
+    services: existing.services?.map((service) => ({
+      id: service.id,
+      service_name: service.service_name,
+      service_price: service.service_price,
+      cost_price: service.cost_price,
+      notes: service.notes,
+      sort_order: service.sort_order,
+    })),
     status: existing.status,
     priority: existing.priority,
-    service_price: existing.service_price,
-    cost_price: existing.cost_price,
+    service_price: finance.servicePrice,
+    cost_price: finance.costPrice,
     paid_amount: input.paid_amount ?? existing.paid_amount,
     paid_in_full: input.paid_in_full,
     payment_method: input.payment_method ?? existing.payment_method,
@@ -342,7 +439,7 @@ export async function updateDocumentTaskPaymentAction(
   }
 
   const payment = buildPaymentFields({
-    servicePrice: existing.service_price,
+    servicePrice: finance.servicePrice,
     paidAmount: input.paid_amount ?? existing.paid_amount,
     paidInFull: input.paid_in_full,
     paymentMethod: input.payment_method ?? existing.payment_method,

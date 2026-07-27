@@ -1,5 +1,6 @@
 import type { DocumentPaymentStatus } from "@/lib/constants/documents";
 import type { DocumentTask } from "@/lib/types/documents";
+import { resolveTaskPricing } from "@/lib/documents/task-services";
 
 export function derivePaymentStatus(
   paidAmount: number,
@@ -24,9 +25,13 @@ export function canMarkPaidInFull(servicePrice: number | null | undefined): bool
   return servicePrice != null && !Number.isNaN(Number(servicePrice)) && Number(servicePrice) >= 0;
 }
 
-export function inferPaidInFull(task: Pick<DocumentTask, "service_price" | "paid_amount" | "payment_status">): boolean {
-  if (!canMarkPaidInFull(task.service_price)) return false;
-  const servicePrice = Number(task.service_price);
+export function inferPaidInFull(
+  task: Pick<DocumentTask, "service_price" | "cost_price" | "paid_amount" | "payment_status"> & {
+    services?: DocumentTask["services"];
+  }
+): boolean {
+  const { servicePrice } = resolveTaskPricing(task);
+  if (!canMarkPaidInFull(servicePrice)) return false;
   const paidAmount = Number(task.paid_amount ?? 0);
   return paidAmount >= servicePrice && task.payment_status === "paid";
 }

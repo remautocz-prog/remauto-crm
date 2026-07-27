@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 import {
-  calculateOutstandingBalance,
   canMarkPaidInFull,
   inferPaidInFull,
 } from "@/lib/documents/payment";
@@ -47,8 +46,8 @@ export function DocumentTaskFinancePanel({ task }: DocumentTaskFinancePanelProps
   const dash = tCommon("dash");
 
   const finance = getDocumentFinanceSummary(task);
-  const canMarkPaid = canMarkPaidInFull(task.service_price);
-  const outstanding = calculateOutstandingBalance(task.service_price, task.paid_amount);
+  const canMarkPaid = canMarkPaidInFull(finance.servicePrice);
+  const outstanding = finance.outstandingBalance;
 
   function showToast(message: string) {
     setToast(message);
@@ -73,7 +72,7 @@ export function DocumentTaskFinancePanel({ task }: DocumentTaskFinancePanelProps
     startTransition(async () => {
       const result = await updateDocumentTaskPaymentAction(task.id, {
         paid_in_full: checked,
-        paid_amount: checked ? Number(task.service_price) : task.paid_amount,
+        paid_amount: checked ? finance.servicePrice : task.paid_amount,
       });
       if (!result.success) {
         setPaidInFull(!checked);
@@ -93,8 +92,9 @@ export function DocumentTaskFinancePanel({ task }: DocumentTaskFinancePanelProps
         </div>
       ) : null}
       <div className="space-y-4 text-sm">
-        <InfoRow label={t("servicePrice")} value={formatCurrency(finance.servicePrice)} />
-        <InfoRow label={t("costPrice")} value={formatCurrency(finance.costPrice)} />
+        <InfoRow label={t("totalPrice")} value={formatCurrency(finance.servicePrice)} />
+        <InfoRow label={t("totalCost")} value={formatCurrency(finance.costPrice)} />
+        <InfoRow label={t("totalProfit")} value={formatCurrency(finance.profit)} />
         <InfoRow label={t("paidAmount")} value={formatCurrency(finance.paidAmount)} />
         <InfoRow label={t("outstandingBalance")} value={formatCurrency(outstanding)} />
         <div className="flex justify-between gap-4 border-b border-zinc-800/80 py-3">
@@ -113,8 +113,6 @@ export function DocumentTaskFinancePanel({ task }: DocumentTaskFinancePanelProps
               : dash
           }
         />
-        <InfoRow label={t("profit")} value={formatCurrency(finance.profit)} />
-
         <div className="border-t border-zinc-800/80 pt-3 space-y-3 print:hidden">
           <label className="flex items-center gap-2 text-sm text-zinc-200">
             <input

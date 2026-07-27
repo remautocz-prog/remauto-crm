@@ -27,8 +27,8 @@ import { DocumentTaskFormDialog } from "@/components/documents/document-task-for
 import { DocumentsKanban } from "@/components/documents/documents-kanban";
 import { DocumentQuickPayControl } from "@/components/documents/document-quick-pay-control";
 import { DocumentPaymentStatusBadge } from "@/components/documents/document-payment-status-badge";
+import { DocumentInlineStatusSelect, type DocumentStatusToast } from "@/components/documents/document-inline-status-select";
 import { DocumentPriorityBadge } from "@/components/documents/document-priority-badge";
-import { DocumentStatusBadge } from "@/components/documents/document-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,16 +82,16 @@ function getVehicleLabel(task: DocumentTaskWithRelations, dash: string) {
   return getDocumentVehicleTitle(task, task.car, dash);
 }
 
-function getServiceLabel(
+function getServicesSummary(
   task: DocumentTaskWithRelations,
-  tServices: (key: string) => string
+  formatCurrency: (value: number) => string,
+  t: (key: "servicesOrderSummary", values: { count: number; price: string }) => string
 ) {
-  if (task.service_type === "custom") {
-    return task.custom_service_name?.trim() || tServices("custom");
-  }
-  return task.service_type
-    ? translateDocumentService(bindDocumentServiceTranslator(tServices as (key: never) => string), task.service_type)
-    : "—";
+  const finance = getDocumentFinanceSummary(task);
+  return t("servicesOrderSummary", {
+    count: finance.serviceCount,
+    price: formatCurrency(finance.servicePrice),
+  });
 }
 
 export function DocumentsList(props: DocumentsListProps) {
@@ -110,6 +110,21 @@ export function DocumentsList(props: DocumentsListProps) {
   const [archived, setArchived] = useState(props.initialArchived);
   const [sort, setSort] = useState(props.initialSort);
   const [view, setView] = useState<"table" | "kanban">(props.initialView);
+  const [statusOverrides, setStatusOverrides] = useState<Record<number, string>>({});
+  const [toast, setToast] = useState<DocumentStatusToast | null>(null);
+
+  function showToast(next: DocumentStatusToast) {
+    setToast(next);
+    window.setTimeout(() => setToast(null), 3000);
+  }
+
+  function handleStatusChange(taskId: number, status: string) {
+    setStatusOverrides((prev) => ({ ...prev, [taskId]: status }));
+  }
+
+  function getTaskStatus(task: DocumentTaskWithRelations) {
+    return statusOverrides[task.id] ?? task.status;
+  }
 
   const t = useTranslations("documents");
   const tActions = useTranslations("actions");
@@ -173,6 +188,18 @@ export function DocumentsList(props: DocumentsListProps) {
 
   return (
     <div className="space-y-6">
+      {toast ? (
+        <div
+          className={`fixed bottom-4 right-4 z-50 rounded-lg border px-4 py-3 text-sm shadow-lg ${
+            toast.type === "success"
+              ? "border-green-500/30 bg-green-950 text-green-200"
+              : "border-red-500/30 bg-red-950 text-red-200"
+          }`}
+          role="status"
+        >
+          {toast.message}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">{t("title")}</h2>
@@ -311,13 +338,13 @@ export function DocumentsList(props: DocumentsListProps) {
                   <th className="px-4 py-3 font-medium">#</th>
                   <th className="px-4 py-3 font-medium">{tFields("client")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("car")}</th>
-                  <th className="px-4 py-3 font-medium">{tFields("service")}</th>
+                  <th className="px-4 py-3 font-medium">{t("servicesTitle")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("manager")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("status")}</th>
                   <th className="px-4 py-3 font-medium">{t("priorityLabel")}</th>
                   <th className="px-4 py-3 font-medium">{t("startDate")}</th>
                   <th className="px-4 py-3 font-medium">{t("dueDate")}</th>
-                  <th className="px-4 py-3 font-medium">{t("servicePrice")}</th>
+                  <th className="px-4 py-3 font-medium">{t("totalPrice")}</th>
                   <th className="px-4 py-3 font-medium">{t("paidAmount")}</th>
                   <th className="px-4 py-3 font-medium">{t("debt")}</th>
                   <th className="px-4 py-3 font-medium">{t("paymentStatusLabel")}</th>
@@ -344,10 +371,17 @@ export function DocumentsList(props: DocumentsListProps) {
                       </td>
                       <td className="px-4 py-3 text-zinc-300">{getVehicleLabel(task, dash)}</td>
                       <td className="px-4 py-3 text-zinc-300">
-                        {getServiceLabel(task, (key) => tServices(key as never))}
+                        {getServicesSummary(task, formatCurrency, t)}
                       </td>
                       <td className="px-4 py-3 text-zinc-300">{task.assignee?.full_name ?? t("unassigned")}</td>
-                      <td className="px-4 py-3"><DocumentStatusBadge status={task.status} /></td>
+                      <td className="px-4 py-3">
+                        <DocumentInlineStatusSelect
+                          taskId={task.id}
+                          status={getTaskStatus(task)}
+                          onStatusChange={handleStatusChange}
+                          onToast={showToast}
+                        />
+                      </td>
                       <td className="px-4 py-3"><DocumentPriorityBadge priority={task.priority} /></td>
                       <td className="px-4 py-3 text-zinc-300">{formatDate(task.started_at, dash)}</td>
                       <td className={`px-4 py-3 ${overdueTask ? "font-medium text-red-400" : "text-zinc-300"}`}>
@@ -379,13 +413,22 @@ export function DocumentsList(props: DocumentsListProps) {
                   <CardHeader>
                     <CardTitle className="text-base text-white">
                       <Link href={`/documents/${task.id}`} className="hover:text-red-400">
-                        #{task.id} — {getServiceLabel(task, (key) => tServices(key as never))}
+                        #{task.id}
                       </Link>
+                      <div className="mt-1 text-sm font-normal text-zinc-400">
+                        {getServicesSummary(task, formatCurrency, t)}
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="grid gap-2 text-sm text-zinc-300">
-                    <div className="flex flex-wrap gap-2">
-                      <DocumentStatusBadge status={task.status} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <DocumentInlineStatusSelect
+                        taskId={task.id}
+                        status={getTaskStatus(task)}
+                        onStatusChange={handleStatusChange}
+                        onToast={showToast}
+                        className="min-w-0 w-full sm:w-auto"
+                      />
                       <DocumentPriorityBadge priority={task.priority} />
                       {overdueTask ? <span className="text-red-400">{t("overdue")}</span> : null}
                     </div>

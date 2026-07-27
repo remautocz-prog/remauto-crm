@@ -13,6 +13,29 @@ export type ChecklistItem = {
   label?: string;
 };
 
+export type DocumentTaskService = {
+  id: string;
+  document_task_id: number;
+  service_name: string;
+  service_price: number;
+  cost_price: number;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocumentTaskServiceFormInput = {
+  id?: string;
+  service_name: string;
+  /** Optional catalog code — used for checklist only, never for pricing. */
+  service_code?: string | null;
+  service_price: number;
+  cost_price: number;
+  notes?: string | null;
+  sort_order?: number;
+};
+
 export type DocumentTask = {
   id: number;
   client_id: number | null;
@@ -28,6 +51,8 @@ export type DocumentTask = {
   /** Legacy NOT NULL column — same value as service_type on write. */
   work_type: DocumentServiceType | string | null;
   custom_service_name: string | null;
+  /** Line items — when present, totals are derived from these rows. */
+  services?: DocumentTaskService[];
   assigned_to: string | null;
   status: DocumentTaskStatus | string;
   priority: DocumentPriority | string;
@@ -35,6 +60,8 @@ export type DocumentTask = {
   due_date: string | null;
   deadline: string | null;
   completed_at: string | null;
+  ready_at: string | null;
+  delivered_at: string | null;
   service_price: number | null;
   cost_price: number | null;
   paid_amount: number;
@@ -93,6 +120,7 @@ export type DocumentTaskFormInput = {
   vehicle_year?: number | null;
   service_type: DocumentServiceType | string | null;
   custom_service_name?: string | null;
+  services?: DocumentTaskServiceFormInput[];
   assigned_to?: string | null;
   status: DocumentTaskStatus | string;
   priority: DocumentPriority | string;
@@ -168,6 +196,8 @@ export type DocumentTaskFinanceSummary = {
   outstandingBalance: number;
   profit: number;
   paymentStatus: DocumentPaymentStatus | string;
+  serviceCount: number;
+  usesServiceRows: boolean;
 };
 
 export type DocumentDashboardMetrics = {

@@ -26,7 +26,7 @@ export function DocumentQuickPayControl({ task, compact }: DocumentQuickPayContr
     return <DocumentPaymentStatusBadge status="paid" />;
   }
 
-  const canMark = canMarkPaidInFull(task.service_price);
+  const canMark = canMarkPaidInFull(finance.servicePrice);
 
   function handleClick() {
     if (!canMark) return;

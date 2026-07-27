@@ -9,6 +9,7 @@ import {
   calculateOutstandingBalance,
   derivePaymentStatus,
 } from "@/lib/documents/payment";
+import { resolveTaskPricing, sortDocumentTaskServices } from "@/lib/documents/task-services";
 import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
 import {
   resolveDocumentVehicleMode,
@@ -55,6 +56,8 @@ export function mapDocumentTask(row: Record<string, unknown>): DocumentTask {
     due_date: (row.due_date as string | null) ?? null,
     deadline: (row.deadline as string | null) ?? null,
     completed_at: (row.completed_at as string | null) ?? null,
+    ready_at: (row.ready_at as string | null) ?? null,
+    delivered_at: (row.delivered_at as string | null) ?? null,
     service_price: row.service_price != null ? Number(row.service_price) : null,
     cost_price: row.cost_price != null ? Number(row.cost_price) : null,
     paid_amount: row.paid_amount != null ? Number(row.paid_amount) : 0,
@@ -87,19 +90,22 @@ export function getDocumentFinanceSummary(
   task: Pick<
     DocumentTask,
     "service_price" | "cost_price" | "paid_amount" | "payment_status"
-  >
+  > & { services?: DocumentTask["services"] }
 ): DocumentTaskFinanceSummary {
-  const servicePrice = Number(task.service_price ?? 0);
-  const costPrice = Number(task.cost_price ?? 0);
+  const pricing = resolveTaskPricing(task);
   const paidAmount = Number(task.paid_amount ?? 0);
 
   return {
-    servicePrice,
-    costPrice,
+    servicePrice: pricing.servicePrice,
+    costPrice: pricing.costPrice,
     paidAmount,
-    outstandingBalance: calculateOutstandingBalance(servicePrice, paidAmount),
-    profit: calculateDocumentProfit(servicePrice, costPrice),
-    paymentStatus: derivePaymentStatus(paidAmount, servicePrice),
+    outstandingBalance: calculateOutstandingBalance(pricing.servicePrice, paidAmount),
+    profit: pricing.profit,
+    paymentStatus: derivePaymentStatus(paidAmount, pricing.servicePrice),
+    serviceCount:
+      task.services?.length ??
+      (pricing.servicePrice > 0 || pricing.costPrice > 0 ? 1 : 0),
+    usesServiceRows: pricing.usesServiceRows,
   };
 }
 
@@ -172,7 +178,36 @@ export function mergeTaskRelations(
   const client = row.clients as DocumentTaskWithRelations["client"];
   const car = row.cars as DocumentTaskWithRelations["car"];
   const assignee = row.assignee as DocumentTaskWithRelations["assignee"];
-  return { ...task, client: client ?? null, car: car ?? null, assignee: assignee ?? null };
+  const rawServices = row.document_task_services as Record<string, unknown>[] | null | undefined;
+  const services = rawServices?.length
+    ? sortDocumentTaskServices(
+        rawServices.map((serviceRow) =>
+          mapDocumentTaskServiceFromRow(serviceRow)
+        )
+      )
+    : undefined;
+
+  return {
+    ...task,
+    services,
+    client: client ?? null,
+    car: car ?? null,
+    assignee: assignee ?? null,
+  };
+}
+
+function mapDocumentTaskServiceFromRow(row: Record<string, unknown>) {
+  return {
+    id: String(row.id),
+    document_task_id: Number(row.document_task_id),
+    service_name: String(row.service_name ?? ""),
+    service_price: row.service_price != null ? Number(row.service_price) : 0,
+    cost_price: row.cost_price != null ? Number(row.cost_price) : 0,
+    notes: (row.notes as string | null) ?? null,
+    sort_order: row.sort_order != null ? Number(row.sort_order) : 0,
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at ?? row.created_at),
+  };
 }
 
 export function normalizeChecklistForPayload(items: ChecklistItem[] | undefined): ChecklistItem[] {
