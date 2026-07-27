@@ -10,7 +10,9 @@ type LoadingMessageKey =
   | "carDetails"
   | "cars"
   | "clientDetails"
-  | "clients";
+  | "clients"
+  | "documents"
+  | "documentDetails";
 
 type LoadingScreenProps = {
   message?: string;
@@ -21,16 +23,21 @@ export function LoadingScreen({ message, messageKey = "app" }: LoadingScreenProp
   const t = useTranslations("loading");
   const tCars = useTranslations("cars");
   const tClients = useTranslations("clients");
+  const tDocuments = useTranslations("documents");
   const resolvedMessage =
     message ??
     (messageKey === "cars"
       ? tCars("loading")
       : messageKey === "clients"
         ? tClients("loading")
+      : messageKey === "documents"
+        ? tDocuments("loading")
       : messageKey === "carDetails"
       ? t("carDetails")
       : messageKey === "clientDetails"
         ? t("clientDetails")
+      : messageKey === "documentDetails"
+        ? t("documentDetails")
       : messageKey === "dashboard"
         ? t("dashboard")
         : messageKey === "signIn"

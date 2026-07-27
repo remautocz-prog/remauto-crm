@@ -1,53 +1,122 @@
 import type { Metadata } from "next";
-import { getLocale, getTranslations } from "next-intl/server";
-import { PageHeader, DataTable } from "@/components/shared/page-shell";
-import { getStatusLabel } from "@/lib/i18n/status-server";
-import { formatDate } from "@/lib/format";
-import { getDocumentTasks } from "@/lib/queries/modules";
-import { getDocumentTaskTitle } from "@/lib/types/database";
-import { isValidLocale, type AppLocale } from "@/i18n/config";
+import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
+import { DocumentsList } from "@/components/documents/documents-list";
+import { LoadingScreen } from "@/components/shared/loading-screen";
+import { getClientOptions, getProfileOptions } from "@/lib/queries/cars";
+import { getDocumentFilterOptions, getDocumentTasks } from "@/lib/queries/documents";
+import { createClient } from "@/lib/supabase/server";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
   return { title: t("documents") };
 }
 
-export default async function DocumentsPage() {
-  const [tasks, t, tFields, tCommon, tEmpty, rawLocale] = await Promise.all([
-    getDocumentTasks(),
-    getTranslations("documents"),
-    getTranslations("fields"),
-    getTranslations("common"),
-    getTranslations("empty"),
-    getLocale(),
+type DocumentsPageProps = {
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    priority?: string;
+    service_type?: string;
+    assigned_to?: string;
+    payment_status?: string;
+    overdue?: string;
+    archived?: string;
+    sort?: string;
+    view?: string;
+    client_id?: string;
+    car_id?: string;
+  }>;
+};
+
+async function getCarOptions() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cars")
+    .select("id, brand, model, year, vin, registration_number, client_id")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Array<{
+    id: number;
+    brand: string;
+    model: string;
+    year: number;
+    vin: string | null;
+    registration_number: string | null;
+    client_id: number | null;
+  }>;
+}
+
+async function DocumentsPageContent({
+  searchParams,
+}: {
+  searchParams: DocumentsPageProps["searchParams"];
+}) {
+  const params = await searchParams;
+  const q = params.q ?? "";
+  const status = params.status ?? "all";
+  const priority = params.priority ?? "all";
+  const serviceType = params.service_type ?? "all";
+  const assignedTo = params.assigned_to ?? "all";
+  const paymentStatus = params.payment_status ?? "all";
+  const overdue = params.overdue === "1";
+  const archived = params.archived === "1";
+  const sort = params.sort ?? "newest";
+  const view = params.view === "kanban" ? "kanban" : "table";
+  const initialClientId = params.client_id ? Number(params.client_id) : null;
+  const initialCarId = params.car_id ? Number(params.car_id) : null;
+
+  const [tasks, clients, cars, profiles, filterOptions] = await Promise.all([
+    getDocumentTasks({
+      q,
+      status,
+      priority,
+      service_type: serviceType,
+      assigned_to: assignedTo,
+      payment_status: paymentStatus,
+      overdue,
+      archived,
+      sort,
+    }),
+    getClientOptions(),
+    getCarOptions(),
+    getProfileOptions(),
+    getDocumentFilterOptions(),
   ]);
-  const locale: AppLocale = isValidLocale(rawLocale) ? rawLocale : "ru";
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("description")} />
-      <DataTable
-        title={t("tableTitle")}
-        headers={[
-          t("task"),
-          tFields("type"),
-          tFields("status"),
-          t("carId"),
-          tFields("created"),
-        ]}
-        rows={await Promise.all(
-          tasks.map(async (task) => [
-            getDocumentTaskTitle(task, (id) => t("taskFallback", { id })),
-            task.type ?? tCommon("dash"),
-            await getStatusLabel(task.status),
-            task.car_id ? String(task.car_id) : tCommon("dash"),
-            formatDate(task.created_at, locale, tCommon("dash")),
-          ])
-        )}
-        emptyMessage={tEmpty("default", {
-          entity: t("tableTitle").toLowerCase(),
-        })}
-      />
-    </div>
+    <DocumentsList
+      tasks={tasks}
+      clients={clients}
+      cars={cars}
+      profiles={profiles}
+      assignees={filterOptions.assignees}
+      initialQuery={q}
+      initialStatus={status}
+      initialPriority={priority}
+      initialServiceType={serviceType}
+      initialAssignedTo={assignedTo}
+      initialPaymentStatus={paymentStatus}
+      initialOverdue={overdue}
+      initialArchived={archived}
+      initialSort={sort}
+      initialView={view}
+      initialClientId={
+        initialClientId != null && !Number.isNaN(initialClientId) ? initialClientId : null
+      }
+      initialCarId={
+        initialCarId != null && !Number.isNaN(initialCarId) ? initialCarId : null
+      }
+    />
+  );
+}
+
+export default async function DocumentsPage({ searchParams }: DocumentsPageProps) {
+  const t = await getTranslations("documents");
+
+  return (
+    <Suspense fallback={<LoadingScreen message={t("loading")} />}>
+      <DocumentsPageContent searchParams={searchParams} />
+    </Suspense>
   );
 }

@@ -8,11 +8,11 @@ import { getClientDisplayName } from "@/lib/clients/validation";
 import {
   getClientById,
   getClientDetailingOrders,
-  getClientDocumentTasks,
   getClientFinanceTransactions,
   getClientRelatedCars,
   getClientRelatedCounts,
 } from "@/lib/queries/clients";
+import { getClientDocumentSummary } from "@/lib/queries/documents";
 
 type ClientDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -37,10 +37,10 @@ export async function generateMetadata({
 }
 
 async function loadClientDetail(clientId: number) {
-  const [client, cars, documentTasks, detailingOrders, relatedCounts] = await Promise.all([
+  const [client, cars, documentSummary, detailingOrders, relatedCounts] = await Promise.all([
     getClientById(clientId),
     getClientRelatedCars(clientId),
-    getClientDocumentTasks(clientId),
+    getClientDocumentSummary(clientId),
     getClientDetailingOrders(clientId),
     getClientRelatedCounts(clientId),
   ]);
@@ -56,7 +56,7 @@ async function loadClientDetail(clientId: number) {
     client,
     cars,
     carGroups,
-    documentTasks,
+    documentSummary,
     detailingOrders,
     financeTransactions,
     financeSummary,
@@ -85,7 +85,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
   const activityItems = buildClientActivityTimeline({
     client: data.client,
     cars: data.cars,
-    documentTasks: data.documentTasks,
+    documentTasks: data.documentSummary.all,
     detailingOrders: data.detailingOrders,
     financeTransactions: data.financeTransactions,
     labels: {
@@ -112,7 +112,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
       client={data.client}
       cars={data.cars}
       carGroups={data.carGroups}
-      documentTasks={data.documentTasks}
+      documentSummary={data.documentSummary}
       detailingOrders={data.detailingOrders}
       financeTransactions={data.financeTransactions}
       financeSummary={data.financeSummary}

@@ -1,10 +1,17 @@
+import { COMPLETED_DOCUMENT_TASK_STATUSES } from "@/lib/constants/documents";
 import type { Car } from "@/lib/types/cars";
 import type { DetailingOrder, DocumentTask, FinanceTransaction } from "@/lib/types/database";
 import type { Client, ClientActivityItem } from "@/lib/types/clients";
 import { getDocumentTaskTitle } from "@/lib/types/database";
 
-const COMPLETED_STATUSES = new Set(["completed", "done", "sold", "archived", "closed"]);
-const OPEN_STATUSES = new Set(["pending", "open", "active", "in_progress", "new", "in_stock"]);
+const COMPLETED_STATUSES = new Set([
+  ...COMPLETED_DOCUMENT_TASK_STATUSES,
+  "CANCELLED",
+  "done",
+  "sold",
+  "archived",
+  "closed",
+]);
 
 export function buildClientActivityTimeline(input: {
   client: Client;

@@ -1,19 +1,5 @@
 export type Client = import("@/lib/types/clients").Client;
-
-export type DocumentTask = {
-  id: number;
-  title?: string | null;
-  name?: string | null;
-  task_name?: string | null;
-  type?: string | null;
-  status: string;
-  car_id: number | null;
-  client_id: number | null;
-  deadline?: string | null;
-  notes?: string | null;
-  created_at: string;
-  updated_at?: string | null;
-};
+export type DocumentTask = import("@/lib/types/documents").DocumentTask;
 
 export type DetailingOrder = {
   id: number;
@@ -57,8 +43,18 @@ export function getClientName(client: Pick<Client, "full_name" | "company" | "cl
 }
 
 export function getDocumentTaskTitle(
-  task: DocumentTask,
-  fallback: (id: number) => string
+  task: Pick<
+    DocumentTask,
+    "id" | "service_type" | "work_type" | "custom_service_name"
+  >,
+  fallback: (id: number) => string,
+  serviceLabel?: string
 ) {
-  return task.title ?? task.name ?? task.task_name ?? fallback(task.id);
+  const serviceType = task.service_type ?? task.work_type;
+  if (serviceLabel?.trim()) return serviceLabel;
+  if (serviceType === "custom" && task.custom_service_name?.trim()) {
+    return task.custom_service_name.trim();
+  }
+  if (serviceType) return serviceType;
+  return fallback(task.id);
 }

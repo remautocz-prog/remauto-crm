@@ -9,6 +9,7 @@ import {
   getClientOptions,
   getProfileById,
 } from "@/lib/queries/cars";
+import { getDocumentTasksByCarId } from "@/lib/queries/documents";
 
 type CarDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -34,10 +35,11 @@ export async function generateMetadata({
 }
 
 async function loadCarDetail(carId: number) {
-  const [car, expenses, clients] = await Promise.all([
+  const [car, expenses, clients, documentTasks] = await Promise.all([
     getCarById(carId),
     getCarExpenses(carId),
     getClientOptions(),
+    getDocumentTasksByCarId(carId),
   ]);
 
   const [client, owner, manager] = await Promise.all([
@@ -50,6 +52,7 @@ async function loadCarDetail(carId: number) {
     car,
     expenses,
     clients,
+    documentTasks,
     clientName: client?.full_name ?? null,
     ownerName: owner?.full_name ?? null,
     managerName: manager?.full_name ?? null,
@@ -77,6 +80,7 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
       clientName={data.clientName}
       ownerName={data.ownerName}
       managerName={data.managerName}
+      documentTasks={data.documentTasks}
     />
   );
 }

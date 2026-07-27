@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, BadgeCheck, ExternalLink, Pencil } from "lucide-react";
 import type { Car, CarExpense, ClientOption } from "@/lib/types/cars";
+import type { DocumentTaskWithRelations } from "@/lib/types/documents";
+import { DocumentsSection } from "@/components/documents/documents-section";
 import { DEFAULT_BUSINESS_MODEL } from "@/lib/constants/business-model";
 import { formatGrossCommissionDisplay } from "@/lib/cars/business-rules";
 import { CarStatusBadge } from "@/components/cars/car-status-badge";
@@ -25,6 +27,7 @@ type CarDetailsProps = {
   clientName?: string | null;
   ownerName?: string | null;
   managerName?: string | null;
+  documentTasks?: DocumentTaskWithRelations[];
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -43,8 +46,10 @@ export function CarDetails({
   clientName,
   ownerName,
   managerName,
+  documentTasks = [],
 }: CarDetailsProps) {
   const [soldOpen, setSoldOpen] = useState(false);
+  const tDocuments = useTranslations("documents");
   const totalExpenses = expenses.reduce(
     (sum, expense) => sum + Number(expense.amount),
     0
@@ -266,6 +271,14 @@ export function CarDetails({
       {(model === "owned" || model === "commission" || model === "client_order") && (
         <CarExpensesSection car={car} expenses={expenses} />
       )}
+
+      <DocumentsSection
+        title={tDocuments("title")}
+        tasks={documentTasks}
+        createHref={`/documents?car_id=${car.id}${car.client_id ? `&client_id=${car.client_id}` : ""}`}
+        emptyMessage={tDocuments("empty")}
+        compact
+      />
 
       <MarkSoldDialog
         car={car}

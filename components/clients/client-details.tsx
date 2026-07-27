@@ -19,8 +19,9 @@ import type {
   ClientActivityItem,
   ClientRelatedCounts,
 } from "@/lib/types/clients";
-import type { DetailingOrder, DocumentTask, FinanceTransaction } from "@/lib/types/database";
-import { getDocumentTaskTitle } from "@/lib/types/database";
+import type { DetailingOrder, FinanceTransaction } from "@/lib/types/database";
+import type { DocumentTaskWithRelations } from "@/lib/types/documents";
+import { DocumentsSection } from "@/components/documents/documents-section";
 import type { ClientFinanceSummary } from "@/lib/clients/revenue";
 import { getClientDisplayName } from "@/lib/clients/validation";
 import { ClientActivitySection } from "@/components/clients/client-activity-section";
@@ -48,7 +49,11 @@ type ClientDetailsProps = {
   client: Client;
   cars: CarRecord[];
   carGroups: ClientCarsGroups;
-  documentTasks: DocumentTask[];
+  documentSummary: {
+    active: DocumentTaskWithRelations[];
+    completed: DocumentTaskWithRelations[];
+    unpaidBalance: number;
+  };
   detailingOrders: DetailingOrder[];
   financeTransactions: FinanceTransaction[];
   financeSummary: ClientFinanceSummary;
@@ -115,7 +120,7 @@ function CarsGroupSection({
 export function ClientDetails({
   client,
   carGroups,
-  documentTasks,
+  documentSummary,
   detailingOrders,
   financeTransactions,
   financeSummary,
@@ -258,6 +263,10 @@ export function ClientDetails({
               label={t("soldCarsCount")}
               value={String(financeSummary.soldCarsCount)}
             />
+            <InfoRow
+              label={t("documentsUnpaidBalance")}
+              value={formatCurrency(documentSummary.unpaidBalance)}
+            />
           </CardContent>
         </Card>
       </div>
@@ -296,52 +305,21 @@ export function ClientDetails({
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="border-zinc-800 bg-zinc-900/60">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base text-white">{t("documentsTitle")}</CardTitle>
-            <Button asChild size="sm" variant="ghost">
-              <Link href={`/documents?client_id=${client.id}`}>
-                <Plus className="h-4 w-4" />
-                {t("addDocumentTask")}
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {documentTasks.length === 0 ? (
-              <p className="text-sm text-zinc-400">{t("noDocuments")}</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-zinc-500">
-                    <tr>
-                      <th className="pb-2 font-medium">{tDocuments("task")}</th>
-                      <th className="pb-2 font-medium">{tFields("status")}</th>
-                      <th className="pb-2 font-medium">{t("deadline")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documentTasks.map((task) => (
-                      <tr key={task.id} className="border-t border-zinc-800/80">
-                        <td className="py-2 text-zinc-200">
-                          {getDocumentTaskTitle(task, (id) =>
-                            tDocuments("taskFallback", { id })
-                          )}
-                        </td>
-                        <td className="py-2 text-zinc-300">
-                          {translateStatus(tStatus, task.status)}
-                        </td>
-                        <td className="py-2 text-zinc-300">
-                          {formatDate(task.deadline, dash)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <DocumentsSection
+          title={tDocuments("activeTasksTitle")}
+          tasks={documentSummary.active}
+          createHref={`/documents?client_id=${client.id}`}
+          emptyMessage={t("noDocuments")}
+        />
+        <DocumentsSection
+          title={tDocuments("completedTasksTitle")}
+          tasks={documentSummary.completed}
+          createHref={`/documents?client_id=${client.id}`}
+          emptyMessage={t("noDocuments")}
+        />
+      </div>
 
+      <div className="grid gap-6 xl:grid-cols-2">
         <Card className="border-zinc-800 bg-zinc-900/60">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base text-white">{t("detailingTitle")}</CardTitle>
