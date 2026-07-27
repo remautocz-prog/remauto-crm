@@ -151,6 +151,7 @@ export type DocumentTasksListParams = {
   due_this_week?: boolean;
   no_deadline?: boolean;
   unassigned_only?: boolean;
+  outstanding_only?: boolean;
   archived?: boolean;
   sort?: string;
 };

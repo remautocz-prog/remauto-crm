@@ -1,112 +1,50 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { DocumentDashboardPanel } from "@/components/dashboard/document-dashboard-panel";
-import { DashboardStatsCards } from "@/components/dashboard/stats-cards";
+import { OperationsDashboard } from "@/components/dashboard/operations-dashboard";
 import { LoadingScreen } from "@/components/shared/loading-screen";
-import { getDashboardStats, getCurrentUser } from "@/lib/queries/dashboard";
-import { getCarBusinessStats } from "@/lib/queries/car-business-stats";
-import {
-  getDocumentDashboardAlerts,
-  getDocumentDashboardMetrics,
-  getDocumentEmployeeWorkload,
-  getDocumentTodaysWork,
-} from "@/lib/queries/documents";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { parseDashboardPeriod } from "@/lib/dashboard/period";
+import { getCurrentUser } from "@/lib/queries/dashboard";
+import { getProfileOptions } from "@/lib/queries/cars";
+import { getOperationsDashboardData } from "@/lib/queries/operations-dashboard";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
   return { title: t("dashboard") };
 }
 
-async function DashboardContent() {
-  const [stats, businessStats, user, documentMetrics, todaysWork, employeeWorkload, t, tDocuments] =
-    await Promise.all([
-    getDashboardStats(),
-    getCarBusinessStats(),
-    getCurrentUser(),
-    getDocumentDashboardMetrics(),
-    getDocumentTodaysWork(),
-    getDocumentEmployeeWorkload(),
-    getTranslations("dashboard"),
-    getTranslations("documents.dashboard"),
-  ]);
+type DashboardPageProps = {
+  searchParams: Promise<{ period?: string }>;
+};
 
-  const documentAlerts = await getDocumentDashboardAlerts({
-    overdue: (id) => tDocuments("alertOverdue", { id }),
-    dueToday: (id) => tDocuments("alertDueToday", { id }),
-    dueSoon: (id) => tDocuments("alertDueSoon", { id }),
-    completedUnpaid: (id) => tDocuments("alertCompletedUnpaid", { id }),
-    readyForDelivery: (id) => tDocuments("alertReadyForDelivery", { id }),
-  });
+async function DashboardContent({ searchParams }: DashboardPageProps) {
+  const params = await searchParams;
+  const period = parseDashboardPeriod(params.period);
+
+  const [data, profiles, user] = await Promise.all([
+    getOperationsDashboardData(period),
+    getProfileOptions(),
+    getCurrentUser(),
+  ]);
 
   const displayName =
     user?.user_metadata?.full_name ??
     user?.email?.split("@")[0] ??
-    t("colleague");
+    null;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-white">
-          {t("welcome")}, {displayName}
-        </h2>
-        <p className="text-zinc-400">{t("overview")}</p>
-      </div>
-
-      <DashboardStatsCards stats={stats} businessStats={businessStats} />
-
-      <DocumentDashboardPanel
-        metrics={documentMetrics}
-        alerts={documentAlerts}
-        todaysWork={todaysWork}
-        employeeWorkload={employeeWorkload}
-      />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-zinc-800 bg-zinc-900/60">
-          <CardHeader>
-            <CardTitle className="text-base text-white">
-              {t("quickActions")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-sm text-zinc-400">
-            <p>{t("addCarHint")}</p>
-            <p>{t("createClientHint")}</p>
-            <p>{t("scheduleDetailingHint")}</p>
-            <p>{t("logFinanceHint")}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-zinc-800 bg-zinc-900/60">
-          <CardHeader>
-            <CardTitle className="text-base text-white">
-              {t("systemStatus")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400">{t("supabaseConnection")}</span>
-              <span className="font-medium text-green-500">{t("connected")}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400">{t("authentication")}</span>
-              <span className="font-medium text-green-500">{t("active")}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400">{t("dataSource")}</span>
-              <span className="font-medium text-white">{t("liveDatabase")}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <OperationsDashboard
+      data={data}
+      profiles={profiles}
+      userName={displayName}
+    />
   );
 }
 
-export default function DashboardPage() {
+export default function DashboardPage({ searchParams }: DashboardPageProps) {
   return (
     <Suspense fallback={<LoadingScreen messageKey="dashboard" />}>
-      <DashboardContent />
+      <DashboardContent searchParams={searchParams} />
     </Suspense>
   );
 }

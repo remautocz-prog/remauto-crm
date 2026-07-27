@@ -212,6 +212,12 @@ export async function getDocumentTasks(
     tasks = tasks.filter((task) => isTaskUnassigned(task));
   }
 
+  if (params.outstanding_only) {
+    tasks = tasks.filter(
+      (task) => getDocumentFinanceSummary(task).outstandingBalance > 0
+    );
+  }
+
   return sortTasks(tasks, params.sort);
 }
 

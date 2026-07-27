@@ -20,6 +20,9 @@ type DocumentsPageProps = {
     service_type?: string;
     assigned_to?: string;
     payment_status?: string;
+    deadline?: string;
+    assignment?: string;
+    payment?: string;
     overdue?: string;
     due_today?: string;
     due_this_week?: string;
@@ -63,11 +66,15 @@ async function DocumentsPageContent({
   const serviceType = params.service_type ?? "all";
   const assignedTo = params.assigned_to ?? "all";
   const paymentStatus = params.payment_status ?? "all";
-  const overdue = params.overdue === "1";
-  const dueToday = params.due_today === "1";
+  const overdue =
+    params.overdue === "1" || params.deadline === "overdue";
+  const dueToday =
+    params.due_today === "1" || params.deadline === "today";
   const dueThisWeek = params.due_this_week === "1";
   const noDeadline = params.no_deadline === "1";
-  const unassignedOnly = params.unassigned_only === "1";
+  const unassignedOnly =
+    params.unassigned_only === "1" || params.assignment === "unassigned";
+  const outstandingOnly = params.payment === "unpaid";
   const archived = params.archived === "1";
   const sort = params.sort ?? "newest";
   const view = params.view === "kanban" ? "kanban" : "table";
@@ -87,6 +94,7 @@ async function DocumentsPageContent({
       due_this_week: dueThisWeek,
       no_deadline: noDeadline,
       unassigned_only: unassignedOnly,
+      outstanding_only: outstandingOnly,
       archived,
       sort,
     }),
