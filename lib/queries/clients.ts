@@ -32,7 +32,11 @@ function mapClient(row: Record<string, unknown>): Client {
 
 export async function getClients(params: ClientsListParams = {}) {
   const supabase = await createClient();
-  let query = supabase.from("clients").select("*").eq("is_active", true);
+  let query = supabase.from("clients").select("*");
+
+  if (!params.show_archived) {
+    query = query.eq("is_active", true);
+  }
 
   if (params.client_type && params.client_type !== "all") {
     query = query.eq("client_type", params.client_type);
@@ -49,7 +53,7 @@ export async function getClients(params: ClientsListParams = {}) {
   if (params.q?.trim()) {
     const term = `%${params.q.trim()}%`;
     query = query.or(
-      `full_name.ilike.${term},company.ilike.${term},phone.ilike.${term},email.ilike.${term}`
+      `full_name.ilike.${term},company.ilike.${term},phone.ilike.${term},email.ilike.${term},tax_id.ilike.${term}`
     );
   }
 
@@ -256,4 +260,38 @@ export async function getClientRelatedCounts(clientId: number): Promise<ClientRe
     detailingOrders: detailing.count ?? 0,
     financeTransactions: financeCount,
   };
+}
+
+export async function getCarExpenseTotalsByCarIds(
+  carIds: number[]
+): Promise<Record<number, number>> {
+  if (carIds.length === 0) return {};
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("car_expenses")
+    .select("car_id, amount")
+    .in("car_id", carIds);
+
+  if (error) throw error;
+
+  const totals: Record<number, number> = {};
+  for (const row of data ?? []) {
+    const carId = Number(row.car_id);
+    totals[carId] = (totals[carId] ?? 0) + Number(row.amount ?? 0);
+  }
+  return totals;
+}
+
+export async function getCarsAvailableToLink(clientId: number, limit = 50) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cars")
+    .select("id, brand, model, year, vin, registration_number, client_id, owner_client_id")
+    .or(`client_id.is.null,client_id.neq.${clientId}`)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return data ?? [];
 }

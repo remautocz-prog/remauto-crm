@@ -44,6 +44,7 @@ type ClientsListProps = {
   initialCountry: string;
   initialPreferredLanguage: string;
   initialSort: string;
+  initialShowArchived: boolean;
 };
 
 export function ClientsList({
@@ -54,6 +55,7 @@ export function ClientsList({
   initialCountry,
   initialPreferredLanguage,
   initialSort,
+  initialShowArchived,
 }: ClientsListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -63,6 +65,7 @@ export function ClientsList({
   const [country, setCountry] = useState(initialCountry);
   const [preferredLanguage, setPreferredLanguage] = useState(initialPreferredLanguage);
   const [sort, setSort] = useState(initialSort);
+  const [showArchived, setShowArchived] = useState(initialShowArchived);
 
   const t = useTranslations("clients");
   const tActions = useTranslations("actions");
@@ -80,6 +83,7 @@ export function ClientsList({
     country: string;
     preferred_language: string;
     sort: string;
+    show_archived: boolean;
   }>) {
     const params = new URLSearchParams();
     const q = next.q ?? query;
@@ -87,6 +91,7 @@ export function ClientsList({
     const nextCountry = next.country ?? country;
     const nextLanguage = next.preferred_language ?? preferredLanguage;
     const nextSort = next.sort ?? sort;
+    const nextShowArchived = next.show_archived ?? showArchived;
 
     if (q.trim()) params.set("q", q.trim());
     if (nextType && nextType !== "all") params.set("client_type", nextType);
@@ -95,6 +100,7 @@ export function ClientsList({
       params.set("preferred_language", nextLanguage);
     }
     if (nextSort && nextSort !== "newest") params.set("sort", nextSort);
+    if (nextShowArchived) params.set("show_archived", "1");
 
     startTransition(() => {
       router.push(`/clients${params.toString() ? `?${params.toString()}` : ""}`);
@@ -108,7 +114,8 @@ export function ClientsList({
           (initialClientType && initialClientType !== "all") ||
           (initialCountry && initialCountry !== "all") ||
           (initialPreferredLanguage && initialPreferredLanguage !== "all") ||
-          (initialSort && initialSort !== "newest")
+          (initialSort && initialSort !== "newest") ||
+          initialShowArchived
       ),
     [
       initialClientType,
@@ -116,6 +123,7 @@ export function ClientsList({
       initialPreferredLanguage,
       initialQuery,
       initialSort,
+      initialShowArchived,
     ]
   );
 
@@ -237,7 +245,18 @@ export function ClientsList({
             </Select>
           </div>
 
-          <div className="md:col-span-2 xl:col-span-6">
+          <div className="flex flex-wrap items-center gap-4 md:col-span-2 xl:col-span-6">
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => {
+                  setShowArchived(e.target.checked);
+                  applyFilters({ show_archived: e.target.checked });
+                }}
+              />
+              {t("showArchived")}
+            </label>
             <Button variant="secondary" onClick={() => applyFilters({ q: query })} disabled={isPending}>
               {isPending ? <Loader2 className="animate-spin" /> : null}
               {tActions("applyFilters")}
@@ -295,6 +314,9 @@ export function ClientsList({
                       >
                         {getClientDisplayName(client)}
                       </Link>
+                      {!client.is_active ? (
+                        <span className="ml-2 text-xs text-zinc-500">{t("archivedBadge")}</span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-zinc-300">
                       {translateClientType(tClientType, client.client_type)}

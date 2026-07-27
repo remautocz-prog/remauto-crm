@@ -18,6 +18,7 @@ type ClientsPageProps = {
     country?: string;
     preferred_language?: string;
     sort?: string;
+    show_archived?: string;
   }>;
 };
 
@@ -32,6 +33,7 @@ async function ClientsPageContent({
   const country = params.country ?? "all";
   const preferredLanguage = params.preferred_language ?? "all";
   const sort = params.sort ?? "newest";
+  const showArchived = params.show_archived === "1";
 
   const [clients, filterOptions] = await Promise.all([
     getClients({
@@ -40,6 +42,7 @@ async function ClientsPageContent({
       country,
       preferred_language: preferredLanguage,
       sort,
+      show_archived: showArchived,
     }),
     getClientFilterOptions(),
   ]);
@@ -53,6 +56,7 @@ async function ClientsPageContent({
       initialCountry={country}
       initialPreferredLanguage={preferredLanguage}
       initialSort={sort}
+      initialShowArchived={showArchived}
     />
   );
 }

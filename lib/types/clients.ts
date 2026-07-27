@@ -46,6 +46,24 @@ export type ClientsListParams = {
   country?: string;
   preferred_language?: string;
   sort?: string;
+  show_archived?: boolean;
+};
+
+export type ClientNote = {
+  id: string;
+  client_id: number;
+  content: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  author?: {
+    id: string;
+    full_name: string | null;
+  } | null;
+};
+
+export type ClientNoteFormInput = {
+  content: string;
 };
 
 export type ClientDuplicateMatch = {
@@ -69,13 +87,19 @@ export type ClientActivityItem = {
   id: string;
   kind:
     | "client_created"
+    | "client_updated"
+    | "client_archived"
+    | "client_unarchived"
     | "car_added"
     | "car_sold"
     | "document_created"
     | "document_completed"
+    | "document_status_changed"
+    | "document_payment_marked"
     | "detailing_created"
     | "detailing_completed"
-    | "payment_registered";
+    | "payment_registered"
+    | "note_added";
   title: string;
   subtitle?: string | null;
   occurredAt: string;

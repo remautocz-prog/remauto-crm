@@ -72,6 +72,7 @@ export async function getClientOptions() {
   const { data, error } = await supabase
     .from("clients")
     .select("id, full_name, email")
+    .eq("is_active", true)
     .order("full_name", { ascending: true });
 
   if (error) throw error;

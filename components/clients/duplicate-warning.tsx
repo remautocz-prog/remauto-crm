@@ -16,7 +16,7 @@ export function DuplicateWarning({ duplicates }: DuplicateWarningProps) {
 
   return (
     <div className="rounded-md border border-amber-600/30 bg-amber-600/10 px-3 py-3 text-sm text-amber-200">
-      <p className="font-medium">{t("duplicateWarningTitle")}</p>
+      <p className="font-medium">{t("possibleDuplicateClient")}</p>
       <ul className="mt-2 space-y-2">
         {duplicates.map((duplicate) => (
           <li key={duplicate.id}>

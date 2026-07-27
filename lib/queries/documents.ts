@@ -520,8 +520,12 @@ export async function getDocumentEmployeeWorkload(): Promise<DocumentEmployeeWor
 
 export async function getClientDocumentSummary(clientId: number) {
   const tasks = await getDocumentTasksByClientId(clientId);
-  const active = tasks.filter((task) => isTaskActive(task) && !isTaskArchived(task) &&
-    !COMPLETED_DOCUMENT_TASK_STATUSES.includes(task.status as never));
+  const active = tasks.filter(
+    (task) =>
+      isTaskActive(task) &&
+      !isTaskArchived(task) &&
+      !TERMINAL_DOCUMENT_TASK_STATUSES.includes(task.status as never)
+  );
   const completed = tasks.filter((task) =>
     COMPLETED_DOCUMENT_TASK_STATUSES.includes(task.status as never)
   );

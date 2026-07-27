@@ -5,60 +5,63 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
   ArrowLeft,
-  Car,
-  FileText,
   Mail,
+  MessageCircle,
   Pencil,
   Phone,
-  Plus,
-  Sparkles,
 } from "lucide-react";
 import type { Car as CarRecord } from "@/lib/types/cars";
 import type {
   Client,
   ClientActivityItem,
-  ClientRelatedCounts,
+  ClientNote,
 } from "@/lib/types/clients";
-import type { DetailingOrder, FinanceTransaction } from "@/lib/types/database";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
-import { DocumentsSection } from "@/components/documents/documents-section";
-import type { ClientFinanceSummary } from "@/lib/clients/revenue";
+import { buildTelHref, buildWhatsAppHref } from "@/lib/clients/phone";
+import type { ClientProfileFinance } from "@/lib/clients/profile-finance";
 import { getClientDisplayName } from "@/lib/clients/validation";
 import { ClientActivitySection } from "@/components/clients/client-activity-section";
+import { ClientArchiveButton } from "@/components/clients/client-archive-button";
+import { ClientDocumentsPanel } from "@/components/clients/client-documents-panel";
+import { ClientFinancePanel } from "@/components/clients/client-finance-panel";
 import { ClientFormDialog } from "@/components/clients/client-form-dialog";
+import { ClientNotesSection } from "@/components/clients/client-notes-section";
+import { ClientSummaryCards } from "@/components/clients/client-summary-cards";
 import { ClientTypeBadge } from "@/components/clients/client-type-badge";
-import { DeleteClientButton } from "@/components/clients/delete-client-button";
-import { BusinessModelBadge } from "@/components/cars/business-model-badge";
-import { CarStatusBadge } from "@/components/cars/car-status-badge";
+import { ClientVehiclesPanel } from "@/components/clients/client-vehicles-panel";
+import { DocumentTaskFormDialog } from "@/components/documents/document-task-form-dialog";
+import type { DocumentCarOption } from "@/lib/documents/vehicle";
+import type { ClientOption, Profile } from "@/lib/types/cars";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFormatters } from "@/lib/hooks/use-formatters";
 import { translatePreferredLanguage } from "@/lib/i18n/clients";
-import { translateBusinessModel } from "@/lib/i18n/business-model";
-import { translateFinanceType, translateStatus } from "@/lib/i18n/status";
+import { cn } from "@/lib/utils";
 
-type ClientCarsGroups = {
-  owned: CarRecord[];
-  commission: CarRecord[];
-  clientOrders: CarRecord[];
-  asBuyer: CarRecord[];
-  asOwner: CarRecord[];
+type LinkableCar = {
+  id: number;
+  brand: string;
+  model: string;
+  year: number;
+  vin: string | null;
+  registration_number: string | null;
 };
 
 type ClientDetailsProps = {
   client: Client;
   cars: CarRecord[];
-  carGroups: ClientCarsGroups;
-  documentSummary: {
-    active: DocumentTaskWithRelations[];
-    completed: DocumentTaskWithRelations[];
-    unpaidBalance: number;
-  };
-  detailingOrders: DetailingOrder[];
-  financeTransactions: FinanceTransaction[];
-  financeSummary: ClientFinanceSummary;
-  relatedCounts: ClientRelatedCounts;
+  carExpenseTotals: Record<number, number>;
+  linkableCars: LinkableCar[];
+  documentTasks: DocumentTaskWithRelations[];
+  profileFinance: ClientProfileFinance;
+  notes: ClientNote[];
   activityItems: ClientActivityItem[];
+  currentUserId: string | null;
+  documentFormOptions: {
+    clients: ClientOption[];
+    cars: DocumentCarOption[];
+    profiles: Profile[];
+  };
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -70,346 +73,169 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CarMiniRow({ car }: { car: CarRecord }) {
-  const t = useTranslations("clients");
-  const model = car.business_model ?? "owned";
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 py-3 last:border-0">
-      <div className="space-y-1">
-        <Link href={`/cars/${car.id}`} className="font-medium text-white hover:text-red-400">
-          {car.brand} {car.model} ({car.year})
-        </Link>
-        <div className="flex flex-wrap gap-2">
-          <CarStatusBadge status={car.status} />
-          <BusinessModelBadge businessModel={model} />
-        </div>
-      </div>
-      <Button asChild variant="ghost" size="sm">
-        <Link href={`/cars/${car.id}`}>{t("viewCar")}</Link>
-      </Button>
-    </div>
-  );
-}
-
-function CarsGroupSection({
-  title,
-  cars,
-  empty,
-}: {
-  title: string;
-  cars: CarRecord[];
-  empty: string;
-}) {
-  return (
-    <div className="space-y-2">
-      <h4 className="text-sm font-medium text-zinc-300">{title}</h4>
-      {cars.length === 0 ? (
-        <p className="text-sm text-zinc-500">{empty}</p>
-      ) : (
-        <div className="rounded-lg border border-zinc-800/80 px-3">
-          {cars.map((car) => (
-            <CarMiniRow key={car.id} car={car} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function ClientDetails({
   client,
-  carGroups,
-  documentSummary,
-  detailingOrders,
-  financeTransactions,
-  financeSummary,
-  relatedCounts,
+  cars,
+  carExpenseTotals,
+  linkableCars,
+  documentTasks,
+  profileFinance,
+  notes,
   activityItems,
+  currentUserId,
+  documentFormOptions,
 }: ClientDetailsProps) {
   const [editOpen, setEditOpen] = useState(false);
+  const [createDocumentOpen, setCreateDocumentOpen] = useState(false);
 
   const t = useTranslations("clients");
   const tActions = useTranslations("actions");
   const tFields = useTranslations("fields");
   const tCommon = useTranslations("common");
-  const tDocuments = useTranslations("documents");
-  const tDetailing = useTranslations("detailing");
-  const tFinance = useTranslations("finance");
-  const tBusinessModel = useTranslations("businessModel");
-  const tStatus = useTranslations("status");
   const tPreferredLanguage = useTranslations("preferredLanguage");
-  const { formatCurrency, formatDate } = useFormatters();
+  const { formatDate, formatCurrency } = useFormatters();
   const dash = tCommon("dash");
 
   const displayName = getClientDisplayName(client);
   const addressLine = [client.address, client.city, client.postal_code]
     .filter(Boolean)
     .join(", ");
+  const telHref = buildTelHref(client.phone);
+  const whatsappHref = buildWhatsAppHref(client.phone);
+  const hasOutstanding = profileFinance.combined.outstanding > 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-3">
-          <Button asChild variant="ghost" className="px-0 text-zinc-400 hover:text-white">
-            <Link href="/clients">
-              <ArrowLeft className="h-4 w-4" />
-              {tActions("backToList")}
-            </Link>
-          </Button>
-          <div>
+      <div className="space-y-4">
+        <Button asChild variant="ghost" className="px-0 text-zinc-400 hover:text-white">
+          <Link href="/clients">
+            <ArrowLeft className="h-4 w-4" />
+            {tActions("backToList")}
+          </Link>
+        </Button>
+
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-bold text-white">{displayName}</h2>
               <ClientTypeBadge clientType={client.client_type} />
+              {!client.is_active ? (
+                <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs text-zinc-300">
+                  {t("archivedBadge")}
+                </span>
+              ) : null}
             </div>
             {client.client_type === "company" && client.full_name ? (
               <p className="text-zinc-400">{client.full_name}</p>
             ) : null}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400">
+              {client.phone ? <span>{client.phone}</span> : null}
+              {client.email ? <span>{client.email}</span> : null}
+              {client.preferred_language ? (
+                <span>
+                  {translatePreferredLanguage(tPreferredLanguage, client.preferred_language)}
+                </span>
+              ) : null}
+              <span>
+                {tFields("created")}: {formatDate(client.created_at, dash)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {telHref ? (
+              <Button asChild variant="outline">
+                <a href={telHref}>
+                  <Phone className="h-4 w-4" />
+                  {t("call")}
+                </a>
+              </Button>
+            ) : null}
+            {whatsappHref ? (
+              <Button asChild variant="outline">
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle className="h-4 w-4" />
+                  {t("whatsapp")}
+                </a>
+              </Button>
+            ) : null}
+            {client.email ? (
+              <Button asChild variant="outline">
+                <a href={`mailto:${client.email}`}>
+                  <Mail className="h-4 w-4" />
+                  {t("sendEmail")}
+                </a>
+              </Button>
+            ) : null}
+            <Button variant="secondary" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4" />
+              {t("editClient")}
+            </Button>
+            <ClientArchiveButton clientId={client.id} isActive={client.is_active} />
           </div>
         </div>
+      </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" />
-            {t("editClient")}
-          </Button>
-          <Button asChild>
-            <Link href={`/cars/new?client_id=${client.id}`}>
-              <Car className="h-4 w-4" />
-              {t("addVehicle")}
-            </Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href={`/documents?client_id=${client.id}`}>
-              <FileText className="h-4 w-4" />
-              {t("addDocumentTask")}
-            </Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href={`/detailing?client_id=${client.id}`}>
-              <Sparkles className="h-4 w-4" />
-              {t("addDetailingOrder")}
-            </Link>
-          </Button>
-          {client.phone ? (
-            <Button asChild variant="outline">
-              <a href={`tel:${client.phone}`}>
-                <Phone className="h-4 w-4" />
-                {t("callPhone")}
-              </a>
-            </Button>
-          ) : null}
-          {client.email ? (
-            <Button asChild variant="outline">
-              <a href={`mailto:${client.email}`}>
-                <Mail className="h-4 w-4" />
-                {t("sendEmail")}
-              </a>
-            </Button>
-          ) : null}
-          <DeleteClientButton clientId={client.id} relatedCounts={relatedCounts} />
+      {hasOutstanding ? (
+        <div className="rounded-lg border border-orange-500/30 bg-orange-950/40 px-4 py-3 text-sm text-orange-200">
+          {t("clientHasOutstandingBalance")}: {formatCurrency(profileFinance.combined.outstanding)}
         </div>
-      </div>
+      ) : (
+        <div className="rounded-lg border border-green-500/20 bg-green-950/20 px-4 py-3 text-sm text-green-300">
+          {t("noOutstandingBalance")}
+        </div>
+      )}
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <Card className="border-zinc-800 bg-zinc-900/60 xl:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base text-white">{t("detailsTitle")}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <InfoRow label={tFields("phone")} value={client.phone ?? dash} />
-            <InfoRow label={tFields("email")} value={client.email ?? dash} />
-            <InfoRow label={tFields("address")} value={addressLine || dash} />
-            <InfoRow label={tFields("country")} value={client.country ?? dash} />
-            <InfoRow
-              label={tFields("preferredLanguage")}
-              value={
-                client.preferred_language
-                  ? translatePreferredLanguage(tPreferredLanguage, client.preferred_language)
-                  : dash
-              }
-            />
-            <InfoRow label={tFields("taxId")} value={client.tax_id ?? dash} />
-            <InfoRow label={tFields("vatId")} value={client.vat_id ?? dash} />
-            <InfoRow label={tFields("created")} value={formatDate(client.created_at, dash)} />
-            {client.notes ? (
-              <div className="border-t border-zinc-800/80 pt-3">
-                <p className="text-zinc-500">{tFields("notes")}</p>
-                <p className="mt-2 whitespace-pre-wrap text-zinc-200">{client.notes}</p>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+      <ClientSummaryCards finance={profileFinance} />
 
-        <Card className="border-zinc-800 bg-zinc-900/60">
-          <CardHeader>
-            <CardTitle className="text-base text-white">{t("financeTitle")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <InfoRow
-              label={t("remautoRevenue")}
-              value={formatCurrency(financeSummary.remautoRevenue)}
-            />
-            <InfoRow
-              label={tFinance("income")}
-              value={formatCurrency(financeSummary.incomeTotal)}
-            />
-            <InfoRow
-              label={tFinance("expense")}
-              value={formatCurrency(financeSummary.expenseTotal)}
-            />
-            <InfoRow label={tFields("netProfit")} value={formatCurrency(financeSummary.netTotal)} />
-            <InfoRow
-              label={t("soldCarsCount")}
-              value={String(financeSummary.soldCarsCount)}
-            />
-            <InfoRow
-              label={t("documentsUnpaidBalance")}
-              value={formatCurrency(documentSummary.unpaidBalance)}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <ClientDocumentsPanel
+        clientId={client.id}
+        tasks={documentTasks}
+        onCreateOrder={() => setCreateDocumentOpen(true)}
+      />
+
+      <ClientVehiclesPanel
+        clientId={client.id}
+        cars={cars}
+        carExpenseTotals={carExpenseTotals}
+        linkableCars={linkableCars}
+      />
+
+      <ClientNotesSection
+        clientId={client.id}
+        notes={notes}
+        currentUserId={currentUserId}
+      />
+
+      <ClientFinancePanel finance={profileFinance} />
 
       <Card className="border-zinc-800 bg-zinc-900/60">
         <CardHeader>
-          <CardTitle className="text-base text-white">{t("carsTitle")}</CardTitle>
+          <CardTitle className="text-base text-white">{t("clientOverview")}</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-6 lg:grid-cols-2">
-          <CarsGroupSection
-            title={translateBusinessModel(tBusinessModel, "owned")}
-            cars={carGroups.owned}
-            empty={t("noOwnedCars")}
+        <CardContent className="text-sm">
+          <InfoRow label={tFields("phone")} value={client.phone ?? dash} />
+          <InfoRow label={tFields("email")} value={client.email ?? dash} />
+          <InfoRow label={tFields("address")} value={addressLine || dash} />
+          <InfoRow label={tFields("country")} value={client.country ?? dash} />
+          <InfoRow
+            label={tFields("preferredLanguage")}
+            value={
+              client.preferred_language
+                ? translatePreferredLanguage(tPreferredLanguage, client.preferred_language)
+                : dash
+            }
           />
-          <CarsGroupSection
-            title={translateBusinessModel(tBusinessModel, "commission")}
-            cars={carGroups.commission}
-            empty={t("noCommissionCars")}
-          />
-          <CarsGroupSection
-            title={translateBusinessModel(tBusinessModel, "client_order")}
-            cars={carGroups.clientOrders}
-            empty={t("noClientOrderCars")}
-          />
-          <CarsGroupSection
-            title={t("carsAsBuyer")}
-            cars={carGroups.asBuyer}
-            empty={t("noCarsAsBuyer")}
-          />
-          <CarsGroupSection
-            title={t("carsAsOwner")}
-            cars={carGroups.asOwner}
-            empty={t("noCarsAsOwner")}
-          />
+          <InfoRow label={tFields("taxId")} value={client.tax_id ?? dash} />
+          <InfoRow label={tFields("vatId")} value={client.vat_id ?? dash} />
+          {client.notes ? (
+            <div className={cn("border-t border-zinc-800/80 pt-3")}>
+              <p className="text-zinc-500">{tFields("notes")}</p>
+              <p className="mt-2 whitespace-pre-wrap text-zinc-200">{client.notes}</p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <DocumentsSection
-          title={tDocuments("activeTasksTitle")}
-          tasks={documentSummary.active}
-          createHref={`/documents?client_id=${client.id}`}
-          emptyMessage={t("noDocuments")}
-        />
-        <DocumentsSection
-          title={tDocuments("completedTasksTitle")}
-          tasks={documentSummary.completed}
-          createHref={`/documents?client_id=${client.id}`}
-          emptyMessage={t("noDocuments")}
-        />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="border-zinc-800 bg-zinc-900/60">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base text-white">{t("detailingTitle")}</CardTitle>
-            <Button asChild size="sm" variant="ghost">
-              <Link href={`/detailing?client_id=${client.id}`}>
-                <Plus className="h-4 w-4" />
-                {t("addDetailingOrder")}
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {detailingOrders.length === 0 ? (
-              <p className="text-sm text-zinc-400">{t("noDetailing")}</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-zinc-500">
-                    <tr>
-                      <th className="pb-2 font-medium">{tFields("car")}</th>
-                      <th className="pb-2 font-medium">{tFields("status")}</th>
-                      <th className="pb-2 font-medium">{tFields("amount")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detailingOrders.map((order) => (
-                      <tr key={order.id} className="border-t border-zinc-800/80">
-                        <td className="py-2 text-zinc-200">
-                          {order.car_id ? (
-                            <Link
-                              href={`/cars/${order.car_id}`}
-                              className="hover:text-red-400"
-                            >
-                              #{order.car_id}
-                            </Link>
-                          ) : (
-                            dash
-                          )}
-                          {order.service_type ? ` — ${order.service_type}` : ""}
-                        </td>
-                        <td className="py-2 text-zinc-300">
-                          {translateStatus(tStatus, order.status)}
-                        </td>
-                        <td className="py-2 text-zinc-300">
-                          {formatCurrency(Number(order.price))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {financeTransactions.length > 0 ? (
-        <Card className="border-zinc-800 bg-zinc-900/60">
-          <CardHeader>
-            <CardTitle className="text-base text-white">{t("transactionsTitle")}</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-zinc-500">
-                <tr>
-                  <th className="pb-2 font-medium">{tFields("date")}</th>
-                  <th className="pb-2 font-medium">{tFields("type")}</th>
-                  <th className="pb-2 font-medium">{tFields("amount")}</th>
-                  <th className="pb-2 font-medium">{tFields("description")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {financeTransactions.map((tx) => (
-                  <tr key={tx.id} className="border-t border-zinc-800/80">
-                    <td className="py-2 text-zinc-300">
-                      {formatDate(tx.transaction_date, dash)}
-                    </td>
-                    <td className="py-2 text-zinc-300">
-                      {translateFinanceType(tStatus, tFinance, tx.type)}
-                    </td>
-                    <td className="py-2 text-zinc-200">
-                      {formatCurrency(Number(tx.amount))}
-                    </td>
-                    <td className="py-2 text-zinc-300">{tx.description ?? dash}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <ClientActivitySection items={activityItems} />
 
@@ -418,6 +244,16 @@ export function ClientDetails({
         onOpenChange={setEditOpen}
         mode="edit"
         client={client}
+      />
+
+      <DocumentTaskFormDialog
+        open={createDocumentOpen}
+        onOpenChange={setCreateDocumentOpen}
+        mode="create"
+        clients={documentFormOptions.clients}
+        cars={documentFormOptions.cars}
+        profiles={documentFormOptions.profiles}
+        initialClientId={client.id}
       />
     </div>
   );

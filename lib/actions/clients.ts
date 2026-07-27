@@ -12,7 +12,6 @@ import {
 } from "@/lib/clients/validation";
 import {
   getAllClientsForDuplicateCheck,
-  getClientRelatedCounts,
 } from "@/lib/queries/clients";
 import { createClient } from "@/lib/supabase/server";
 import type { ClientDuplicateMatch, ClientFormInput } from "@/lib/types/clients";
@@ -135,22 +134,6 @@ export async function updateClientAction(
 }
 
 export async function archiveClientAction(id: number): Promise<ActionResult> {
-  const related = await getClientRelatedCounts(id);
-  const totalRelated =
-    related.carsAsBuyer +
-    related.carsAsOwner +
-    related.documentTasks +
-    related.detailingOrders +
-    related.financeTransactions;
-
-  if (totalRelated > 0) {
-    const t = await getTranslations("clients");
-    return {
-      success: false,
-      error: t("deleteBlockedRelated", { count: totalRelated }),
-    };
-  }
-
   const supabase = await createClient();
   const { error } = await supabase
     .from("clients")
@@ -163,9 +146,48 @@ export async function archiveClientAction(id: number): Promise<ActionResult> {
   }
 
   revalidatePath("/clients");
+  revalidatePath(`/clients/${id}`);
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   redirect("/clients");
+}
+
+export async function unarchiveClientAction(id: number): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("clients")
+    .update({ is_active: true })
+    .eq("id", id);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidatePath("/clients");
+  revalidatePath(`/clients/${id}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  return { success: true };
+}
+
+export async function linkCarToClientAction(
+  clientId: number,
+  carId: number
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("cars")
+    .update({ client_id: clientId })
+    .eq("id", carId);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath(`/cars/${carId}`);
+  revalidatePath("/cars");
+  return { success: true };
 }
 
 export async function deleteClientAction(id: number): Promise<ActionResult> {
