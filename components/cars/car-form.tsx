@@ -44,9 +44,10 @@ type CarFormProps = {
   clients: ClientOption[];
   profiles: Profile[];
   mode: "create" | "edit";
+  initialClientId?: number | null;
 };
 
-function toFormState(car?: Car): CarFormInput {
+function toFormState(car?: Car, initialClientId?: number | null): CarFormInput {
   return {
     stock_number: car?.stock_number ?? "",
     vin: car?.vin ?? "",
@@ -68,7 +69,7 @@ function toFormState(car?: Car): CarFormInput {
     actual_sale_price: car?.actual_sale_price ?? null,
     purchase_date: car?.purchase_date ?? null,
     sale_date: car?.sale_date ?? null,
-    client_id: car?.client_id ?? null,
+    client_id: car?.client_id ?? initialClientId ?? null,
     manager_id: car?.manager_id ?? null,
     notes: car?.notes ?? "",
   };
@@ -99,13 +100,13 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-sm text-red-400">{message}</p>;
 }
 
-export function CarForm({ car, clients, profiles, mode }: CarFormProps) {
+export function CarForm({ car, clients, profiles, mode, initialClientId }: CarFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<CarFieldErrors>({});
-  const [form, setForm] = useState<CarFormInput>(toFormState(car));
+  const [form, setForm] = useState<CarFormInput>(toFormState(car, initialClientId));
 
   const t = useTranslations("cars");
   const tActions = useTranslations("actions");

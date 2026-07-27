@@ -1,12 +1,4 @@
-export type Client = {
-  id: number;
-  full_name: string;
-  email: string | null;
-  phone: string | null;
-  company: string | null;
-  created_at: string;
-  updated_at: string;
-};
+export type Client = import("@/lib/types/clients").Client;
 
 export type DocumentTask = {
   id: number;
@@ -17,6 +9,8 @@ export type DocumentTask = {
   status: string;
   car_id: number | null;
   client_id: number | null;
+  deadline?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at?: string | null;
 };
@@ -25,10 +19,12 @@ export type DetailingOrder = {
   id: number;
   car_id: number | null;
   client_id: number | null;
-  service_type: string;
+  service_type?: string | null;
   status: string;
   price: number;
-  scheduled_at: string | null;
+  scheduled_at?: string | null;
+  manager_id?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -53,8 +49,11 @@ export type DashboardStats = {
   monthlyProfit: number;
 };
 
-export function getClientName(client: Client, dash = "—") {
-  return client.full_name ?? dash;
+export function getClientName(client: Pick<Client, "full_name" | "company" | "client_type">, dash = "—") {
+  if (client.client_type === "company" && client.company?.trim()) {
+    return client.company.trim();
+  }
+  return client.full_name?.trim() || client.company?.trim() || dash;
 }
 
 export function getDocumentTaskTitle(

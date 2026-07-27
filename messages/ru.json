@@ -96,7 +96,17 @@
     "commission": "Комиссия",
     "netProfit": "Чистая прибыль",
     "vehiclePrice": "Цена автомобиля",
-    "estimated": "оценка"
+    "estimated": "оценка",
+    "fullName": "Полное имя",
+    "contactPerson": "Контактное лицо",
+    "clientType": "Тип клиента",
+    "city": "Город",
+    "postalCode": "Почтовый индекс",
+    "country": "Страна",
+    "preferredLanguage": "Предпочитаемый язык",
+    "taxId": "ИН / IČO",
+    "vatId": "ДИ / DIČ",
+    "address": "Адрес"
   },
   "auth": {
     "welcomeBack": "С возвращением",
@@ -191,7 +201,97 @@
   "clients": {
     "title": "Клиенты",
     "description": "Просмотр и управление базой клиентов.",
-    "tableTitle": "Клиенты"
+    "tableTitle": "Клиенты",
+    "addClient": "Добавить клиента",
+    "editClient": "Редактировать клиента",
+    "createClient": "Создать клиента",
+    "saveChanges": "Сохранить изменения",
+    "addClientDescription": "Заполните данные нового клиента RemAuto.",
+    "editClientDescription": "Обновите информацию о клиенте.",
+    "searchPlaceholder": "Имя, компания, телефон, email...",
+    "loading": "Загрузка клиентов...",
+    "empty": "Список клиентов пуст",
+    "emptyHint": "Добавьте первого клиента, чтобы начать работу.",
+    "notFound": "Клиенты не найдены",
+    "notFoundHint": "Измените параметры поиска или сбросьте фильтры.",
+    "allTypes": "Все типы",
+    "allCountries": "Все страны",
+    "allLanguages": "Все языки",
+    "detailFallback": "Клиент",
+    "detailsTitle": "Информация о клиенте",
+    "financeTitle": "Финансы клиента",
+    "carsTitle": "Автомобили клиента",
+    "documentsTitle": "Документы",
+    "detailingTitle": "Детейлинг",
+    "transactionsTitle": "Финансовые операции",
+    "remautoRevenue": "Доход RemAuto",
+    "soldCarsCount": "Продано автомобилей",
+    "addVehicle": "Добавить автомобиль",
+    "addDocumentTask": "Добавить задачу",
+    "addDetailingOrder": "Добавить заказ",
+    "callPhone": "Позвонить",
+    "sendEmail": "Написать",
+    "viewCar": "Открыть",
+    "deadline": "Срок",
+    "noOwnedCars": "Нет собственных автомобилей",
+    "noCommissionCars": "Нет комиссионных автомобилей",
+    "noClientOrderCars": "Нет автомобилей под заказ",
+    "noCarsAsBuyer": "Нет автомобилей как покупатель",
+    "noCarsAsOwner": "Нет автомобилей как владелец",
+    "noDocuments": "Нет связанных задач по документам",
+    "noDetailing": "Нет связанных заказов на детейлинг",
+    "carsAsBuyer": "Как покупатель",
+    "carsAsOwner": "Как владелец",
+    "duplicateWarningTitle": "Возможно, такой клиент уже существует",
+    "duplicateContinue": "Создать всё равно",
+    "duplicateReason": {
+      "phone": "совпадение телефона",
+      "email": "совпадение email",
+      "company": "совпадение компании",
+      "tax_id": "совпадение ИН / IČO"
+    },
+    "deleteTitle": "Архивировать клиента?",
+    "deleteDescription": "Клиент будет скрыт из списка. Это действие можно отменить только через базу данных.",
+    "confirmArchive": "Архивировать",
+    "deleteBlockedRelated": "Нельзя архивировать: найдено {count} связанных записей.",
+    "relatedCars": "Автомобили: {count}",
+    "relatedDocuments": "Задачи по документам: {count}",
+    "relatedDetailing": "Заказы на детейлинг: {count}",
+    "relatedFinance": "Финансовые операции: {count}",
+    "sort": {
+      "newest": "Сначала новые",
+      "name": "По имени",
+      "company": "По компании",
+      "lastActivity": "По активности"
+    },
+    "validation": {
+      "fullNameRequired": "Укажите полное имя.",
+      "companyRequired": "Укажите название компании.",
+      "contactRequired": "Укажите телефон или email.",
+      "emailInvalid": "Укажите корректный email.",
+      "clientTypeRequired": "Выберите тип клиента."
+    },
+    "activity": {
+      "title": "История активности",
+      "empty": "Пока нет записей активности.",
+      "clientCreated": "Клиент создан",
+      "carAdded": "Добавлен автомобиль {brand} {model}",
+      "carSold": "Продан автомобиль {brand} {model}",
+      "documentCreated": "Создана задача: {title}",
+      "documentCompleted": "Завершена задача: {title}",
+      "detailingCreated": "Создан заказ на детейлинг #{id}",
+      "detailingCompleted": "Завершён заказ на детейлинг #{id}",
+      "paymentRegistered": "Зарегистрирован платёж {amount}"
+    }
+  },
+  "clientType": {
+    "individual": "Физическое лицо",
+    "company": "Компания"
+  },
+  "preferredLanguage": {
+    "ru": "Русский",
+    "cs": "Чешский",
+    "en": "Английский"
   },
   "documents": {
     "title": "Документы",
@@ -287,6 +387,8 @@
     "loadDashboard": "Не удалось загрузить данные панели.",
     "loadCars": "Не удалось загрузить список автомобилей.",
     "loadCarDetails": "Не удалось загрузить карточку автомобиля.",
+    "loadClients": "Не удалось загрузить список клиентов.",
+    "loadClientDetails": "Не удалось загрузить карточку клиента.",
     "duplicateKey": "Запись с такими данными уже существует.",
     "foreignKey": "Связанная запись не найдена. Проверьте клиента или менеджера.",
     "notNull": "Заполните все обязательные поля.",
@@ -296,7 +398,8 @@
     "app": "Загрузка RemAuto CRM...",
     "dashboard": "Загрузка главной...",
     "signIn": "Загрузка входа...",
-    "carDetails": "Загрузка карточки автомобиля..."
+    "carDetails": "Загрузка карточки автомобиля...",
+    "clientDetails": "Загрузка карточки клиента..."
   },
   "empty": {
     "default": "{entity} не найдены. Добавьте записи через приложение."

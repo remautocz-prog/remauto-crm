@@ -96,7 +96,17 @@
     "commission": "Provize",
     "netProfit": "Čistý zisk",
     "vehiclePrice": "Cena vozidla",
-    "estimated": "odhad"
+    "estimated": "odhad",
+    "fullName": "Celé jméno",
+    "contactPerson": "Kontaktní osoba",
+    "clientType": "Typ klienta",
+    "city": "Město",
+    "postalCode": "PSČ",
+    "country": "Země",
+    "preferredLanguage": "Preferovaný jazyk",
+    "taxId": "IČO",
+    "vatId": "DIČ",
+    "address": "Adresa"
   },
   "auth": {
     "welcomeBack": "Vítejte zpět",
@@ -191,7 +201,97 @@
   "clients": {
     "title": "Klienti",
     "description": "Prohlížení a správa databáze klientů.",
-    "tableTitle": "Klienti"
+    "tableTitle": "Klienti",
+    "addClient": "Přidat klienta",
+    "editClient": "Upravit klienta",
+    "createClient": "Vytvořit klienta",
+    "saveChanges": "Uložit změny",
+    "addClientDescription": "Vyplňte údaje nového klienta RemAuto.",
+    "editClientDescription": "Aktualizujte informace o klientovi.",
+    "searchPlaceholder": "Jméno, firma, telefon, email...",
+    "loading": "Načítání klientů...",
+    "empty": "Seznam klientů je prázdný",
+    "emptyHint": "Přidejte prvního klienta a začněte pracovat.",
+    "notFound": "Klienti nenalezeni",
+    "notFoundHint": "Změňte parametry vyhledávání nebo resetujte filtry.",
+    "allTypes": "Všechny typy",
+    "allCountries": "Všechny země",
+    "allLanguages": "Všechny jazyky",
+    "detailFallback": "Klient",
+    "detailsTitle": "Informace o klientovi",
+    "financeTitle": "Finance klienta",
+    "carsTitle": "Vozidla klienta",
+    "documentsTitle": "Dokumenty",
+    "detailingTitle": "Detailing",
+    "transactionsTitle": "Finanční operace",
+    "remautoRevenue": "Příjem RemAuto",
+    "soldCarsCount": "Prodaná vozidla",
+    "addVehicle": "Přidat vozidlo",
+    "addDocumentTask": "Přidat úkol",
+    "addDetailingOrder": "Přidat objednávku",
+    "callPhone": "Zavolat",
+    "sendEmail": "Napsat email",
+    "viewCar": "Otevřít",
+    "deadline": "Termín",
+    "noOwnedCars": "Žádná vlastní vozidla",
+    "noCommissionCars": "Žádná komisní vozidla",
+    "noClientOrderCars": "Žádná vozidla na objednávku",
+    "noCarsAsBuyer": "Žádná vozidla jako kupující",
+    "noCarsAsOwner": "Žádná vozidla jako vlastník",
+    "noDocuments": "Žádné související dokumentové úkoly",
+    "noDetailing": "Žádné související detailingové objednávky",
+    "carsAsBuyer": "Jako kupující",
+    "carsAsOwner": "Jako vlastník",
+    "duplicateWarningTitle": "Klient s těmito údaji možná již existuje",
+    "duplicateContinue": "Přesto vytvořit",
+    "duplicateReason": {
+      "phone": "shoda telefonu",
+      "email": "shoda emailu",
+      "company": "shoda firmy",
+      "tax_id": "shoda IČO"
+    },
+    "deleteTitle": "Archivovat klienta?",
+    "deleteDescription": "Klient bude skryt ze seznamu. Tuto akci lze vrátit pouze v databázi.",
+    "confirmArchive": "Archivovat",
+    "deleteBlockedRelated": "Nelze archivovat: nalezeno {count} souvisejících záznamů.",
+    "relatedCars": "Vozidla: {count}",
+    "relatedDocuments": "Dokumentové úkoly: {count}",
+    "relatedDetailing": "Detailingové objednávky: {count}",
+    "relatedFinance": "Finanční operace: {count}",
+    "sort": {
+      "newest": "Nejnovější",
+      "name": "Podle jména",
+      "company": "Podle firmy",
+      "lastActivity": "Podle aktivity"
+    },
+    "validation": {
+      "fullNameRequired": "Zadejte celé jméno.",
+      "companyRequired": "Zadejte název firmy.",
+      "contactRequired": "Zadejte telefon nebo email.",
+      "emailInvalid": "Zadejte platný email.",
+      "clientTypeRequired": "Vyberte typ klienta."
+    },
+    "activity": {
+      "title": "Historie aktivit",
+      "empty": "Zatím žádné záznamy aktivit.",
+      "clientCreated": "Klient vytvořen",
+      "carAdded": "Přidáno vozidlo {brand} {model}",
+      "carSold": "Prodáno vozidlo {brand} {model}",
+      "documentCreated": "Vytvořen úkol: {title}",
+      "documentCompleted": "Dokončen úkol: {title}",
+      "detailingCreated": "Vytvořena detailingová objednávka #{id}",
+      "detailingCompleted": "Dokončena detailingová objednávka #{id}",
+      "paymentRegistered": "Registrována platba {amount}"
+    }
+  },
+  "clientType": {
+    "individual": "Fyzická osoba",
+    "company": "Firma"
+  },
+  "preferredLanguage": {
+    "ru": "Ruština",
+    "cs": "Čeština",
+    "en": "Angličtina"
   },
   "documents": {
     "title": "Dokumenty",
@@ -287,6 +387,8 @@
     "loadDashboard": "Nepodařilo se načíst data přehledu.",
     "loadCars": "Nepodařilo se načíst seznam vozidel.",
     "loadCarDetails": "Nepodařilo se načíst kartu vozidla.",
+    "loadClients": "Nepodařilo se načíst seznam klientů.",
+    "loadClientDetails": "Nepodařilo se načíst kartu klienta.",
     "duplicateKey": "Záznam s těmito údaji již existuje.",
     "foreignKey": "Související záznam nebyl nalezen. Zkontrolujte klienta nebo manažera.",
     "notNull": "Vyplňte všechna povinná pole.",
@@ -296,7 +398,8 @@
     "app": "Načítání RemAuto CRM...",
     "dashboard": "Načítání přehledu...",
     "signIn": "Načítání přihlášení...",
-    "carDetails": "Načítání karty vozidla..."
+    "carDetails": "Načítání karty vozidla...",
+    "clientDetails": "Načítání karty klienta..."
   },
   "empty": {
     "default": "{entity} nenalezeny. Přidejte záznamy v aplikaci."

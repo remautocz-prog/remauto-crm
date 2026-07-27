@@ -3,7 +3,14 @@
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-type LoadingMessageKey = "app" | "dashboard" | "signIn" | "carDetails" | "cars";
+type LoadingMessageKey =
+  | "app"
+  | "dashboard"
+  | "signIn"
+  | "carDetails"
+  | "cars"
+  | "clientDetails"
+  | "clients";
 
 type LoadingScreenProps = {
   message?: string;
@@ -13,12 +20,17 @@ type LoadingScreenProps = {
 export function LoadingScreen({ message, messageKey = "app" }: LoadingScreenProps) {
   const t = useTranslations("loading");
   const tCars = useTranslations("cars");
+  const tClients = useTranslations("clients");
   const resolvedMessage =
     message ??
     (messageKey === "cars"
       ? tCars("loading")
+      : messageKey === "clients"
+        ? tClients("loading")
       : messageKey === "carDetails"
       ? t("carDetails")
+      : messageKey === "clientDetails"
+        ? t("clientDetails")
       : messageKey === "dashboard"
         ? t("dashboard")
         : messageKey === "signIn"

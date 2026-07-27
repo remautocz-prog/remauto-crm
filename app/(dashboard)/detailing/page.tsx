@@ -35,7 +35,7 @@ export default async function DetailingPage() {
         ]}
         rows={await Promise.all(
           orders.map(async (order) => [
-            order.service_type,
+            order.service_type ?? tCommon("dash"),
             await getStatusLabel(order.status),
             formatCurrency(Number(order.price), locale),
             formatDate(order.scheduled_at, locale, tCommon("dash")),

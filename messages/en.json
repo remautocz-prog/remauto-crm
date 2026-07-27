@@ -96,7 +96,17 @@
     "commission": "Commission",
     "netProfit": "Net profit",
     "vehiclePrice": "Vehicle price",
-    "estimated": "est."
+    "estimated": "est.",
+    "fullName": "Full name",
+    "contactPerson": "Contact person",
+    "clientType": "Client type",
+    "city": "City",
+    "postalCode": "Postal code",
+    "country": "Country",
+    "preferredLanguage": "Preferred language",
+    "taxId": "Tax ID / IČO",
+    "vatId": "VAT ID / DIČ",
+    "address": "Address"
   },
   "auth": {
     "welcomeBack": "Welcome back",
@@ -191,7 +201,97 @@
   "clients": {
     "title": "Clients",
     "description": "View and manage your client database.",
-    "tableTitle": "Clients"
+    "tableTitle": "Clients",
+    "addClient": "Add client",
+    "editClient": "Edit client",
+    "createClient": "Create client",
+    "saveChanges": "Save changes",
+    "addClientDescription": "Fill in the details for a new RemAuto client.",
+    "editClientDescription": "Update client information.",
+    "searchPlaceholder": "Name, company, phone, email...",
+    "loading": "Loading clients...",
+    "empty": "No clients yet",
+    "emptyHint": "Add your first client to get started.",
+    "notFound": "No clients found",
+    "notFoundHint": "Change search parameters or reset filters.",
+    "allTypes": "All types",
+    "allCountries": "All countries",
+    "allLanguages": "All languages",
+    "detailFallback": "Client",
+    "detailsTitle": "Client information",
+    "financeTitle": "Client finance",
+    "carsTitle": "Client vehicles",
+    "documentsTitle": "Documents",
+    "detailingTitle": "Detailing",
+    "transactionsTitle": "Finance transactions",
+    "remautoRevenue": "RemAuto revenue",
+    "soldCarsCount": "Sold vehicles",
+    "addVehicle": "Add vehicle",
+    "addDocumentTask": "Add document task",
+    "addDetailingOrder": "Add detailing order",
+    "callPhone": "Call",
+    "sendEmail": "Send email",
+    "viewCar": "View",
+    "deadline": "Deadline",
+    "noOwnedCars": "No owned vehicles",
+    "noCommissionCars": "No commission vehicles",
+    "noClientOrderCars": "No client-order vehicles",
+    "noCarsAsBuyer": "No vehicles as buyer",
+    "noCarsAsOwner": "No vehicles as owner",
+    "noDocuments": "No related document tasks",
+    "noDetailing": "No related detailing orders",
+    "carsAsBuyer": "As buyer",
+    "carsAsOwner": "As owner",
+    "duplicateWarningTitle": "A client with these details may already exist",
+    "duplicateContinue": "Create anyway",
+    "duplicateReason": {
+      "phone": "phone match",
+      "email": "email match",
+      "company": "company match",
+      "tax_id": "tax ID match"
+    },
+    "deleteTitle": "Archive client?",
+    "deleteDescription": "The client will be hidden from the list. This can only be reversed in the database.",
+    "confirmArchive": "Archive",
+    "deleteBlockedRelated": "Cannot archive: {count} related records found.",
+    "relatedCars": "Vehicles: {count}",
+    "relatedDocuments": "Document tasks: {count}",
+    "relatedDetailing": "Detailing orders: {count}",
+    "relatedFinance": "Finance transactions: {count}",
+    "sort": {
+      "newest": "Newest first",
+      "name": "By name",
+      "company": "By company",
+      "lastActivity": "By activity"
+    },
+    "validation": {
+      "fullNameRequired": "Enter the full name.",
+      "companyRequired": "Enter the company name.",
+      "contactRequired": "Enter a phone number or email.",
+      "emailInvalid": "Enter a valid email address.",
+      "clientTypeRequired": "Select a client type."
+    },
+    "activity": {
+      "title": "Activity history",
+      "empty": "No activity records yet.",
+      "clientCreated": "Client created",
+      "carAdded": "Vehicle added: {brand} {model}",
+      "carSold": "Vehicle sold: {brand} {model}",
+      "documentCreated": "Task created: {title}",
+      "documentCompleted": "Task completed: {title}",
+      "detailingCreated": "Detailing order created #{id}",
+      "detailingCompleted": "Detailing order completed #{id}",
+      "paymentRegistered": "Payment registered: {amount}"
+    }
+  },
+  "clientType": {
+    "individual": "Individual",
+    "company": "Company"
+  },
+  "preferredLanguage": {
+    "ru": "Russian",
+    "cs": "Czech",
+    "en": "English"
   },
   "documents": {
     "title": "Documents",
@@ -287,6 +387,8 @@
     "loadDashboard": "Failed to load dashboard data.",
     "loadCars": "Failed to load the car list.",
     "loadCarDetails": "Failed to load the car details.",
+    "loadClients": "Failed to load the client list.",
+    "loadClientDetails": "Failed to load the client details.",
     "duplicateKey": "A record with this data already exists.",
     "foreignKey": "Related record not found. Check the client or manager.",
     "notNull": "Fill in all required fields.",
@@ -296,7 +398,8 @@
     "app": "Loading RemAuto CRM...",
     "dashboard": "Loading dashboard...",
     "signIn": "Loading sign in...",
-    "carDetails": "Loading car details..."
+    "carDetails": "Loading car details...",
+    "clientDetails": "Loading client details..."
   },
   "empty": {
     "default": "No {entity} found. Add records through the app."

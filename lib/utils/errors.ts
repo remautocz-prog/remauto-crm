@@ -20,4 +20,12 @@ export type ActionResult<T = undefined> =
       success: false;
       error: string;
       fieldErrors?: Partial<Record<string, string>>;
+      duplicates?: Array<{
+        id: number;
+        full_name: string;
+        company: string | null;
+        email: string | null;
+        phone: string | null;
+        matchReason: "phone" | "email" | "company" | "tax_id";
+      }>;
     };
