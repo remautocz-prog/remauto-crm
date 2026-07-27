@@ -38,6 +38,7 @@ import {
   updateDocumentTaskAction,
 } from "@/lib/actions/documents";
 import { DocumentChecklist } from "@/components/documents/document-checklist";
+import { DocumentDeadlineQuickPicks } from "@/components/documents/document-deadline-quick-picks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -328,7 +329,7 @@ export function DocumentTaskFormDialog({
             />
 
             <div className="space-y-2">
-              <Label>{tFields("manager")}</Label>
+              <Label>{t("responsibleEmployee")}</Label>
               <Select
                 value={form.assigned_to ?? "none"}
                 onValueChange={(value) =>
@@ -396,14 +397,18 @@ export function DocumentTaskFormDialog({
                 onChange={(e) => updateField("started_at", e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="document_due_date">{t("dueDate")}</Label>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="document_due_date">{t("deadline")}</Label>
               <Input
                 id="document_due_date"
                 type="date"
                 value={form.due_date ?? ""}
                 onChange={(e) => updateField("due_date", e.target.value)}
                 className={fieldClass("due_date")}
+              />
+              <DocumentDeadlineQuickPicks
+                onSelect={(value) => updateField("due_date", value ?? "")}
+                disabled={isPending}
               />
               <FieldError message={fieldErrors.due_date} />
             </div>

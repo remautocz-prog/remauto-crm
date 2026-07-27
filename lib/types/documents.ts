@@ -147,6 +147,10 @@ export type DocumentTasksListParams = {
   assigned_to?: string;
   payment_status?: string;
   overdue?: boolean;
+  due_today?: boolean;
+  due_this_week?: boolean;
+  no_deadline?: boolean;
+  unassigned_only?: boolean;
   archived?: boolean;
   sort?: string;
 };
@@ -204,6 +208,8 @@ export type DocumentDashboardMetrics = {
   activeTasks: number;
   newTasks: number;
   overdueTasks: number;
+  dueTodayTasks: number;
+  unassignedActiveTasks: number;
   waitingClient: number;
   waitingOffice: number;
   urgentActiveTasks: number;
@@ -212,6 +218,17 @@ export type DocumentDashboardMetrics = {
   monthlyRevenue: number;
   monthlyProfit: number;
 };
+
+export type DocumentEmployeeWorkload = {
+  employeeId: string;
+  employeeName: string;
+  activeOrders: number;
+  overdueOrders: number;
+  dueTodayOrders: number;
+  urgentOrders: number;
+};
+
+export type DocumentTodaysWorkItem = DocumentTaskWithRelations;
 
 export type DocumentDashboardAlert = {
   id: string;

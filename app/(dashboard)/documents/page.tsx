@@ -21,6 +21,10 @@ type DocumentsPageProps = {
     assigned_to?: string;
     payment_status?: string;
     overdue?: string;
+    due_today?: string;
+    due_this_week?: string;
+    no_deadline?: string;
+    unassigned_only?: string;
     archived?: string;
     sort?: string;
     view?: string;
@@ -60,6 +64,10 @@ async function DocumentsPageContent({
   const assignedTo = params.assigned_to ?? "all";
   const paymentStatus = params.payment_status ?? "all";
   const overdue = params.overdue === "1";
+  const dueToday = params.due_today === "1";
+  const dueThisWeek = params.due_this_week === "1";
+  const noDeadline = params.no_deadline === "1";
+  const unassignedOnly = params.unassigned_only === "1";
   const archived = params.archived === "1";
   const sort = params.sort ?? "newest";
   const view = params.view === "kanban" ? "kanban" : "table";
@@ -75,6 +83,10 @@ async function DocumentsPageContent({
       assigned_to: assignedTo,
       payment_status: paymentStatus,
       overdue,
+      due_today: dueToday,
+      due_this_week: dueThisWeek,
+      no_deadline: noDeadline,
+      unassigned_only: unassignedOnly,
       archived,
       sort,
     }),
@@ -98,6 +110,10 @@ async function DocumentsPageContent({
       initialAssignedTo={assignedTo}
       initialPaymentStatus={paymentStatus}
       initialOverdue={overdue}
+      initialDueToday={dueToday}
+      initialDueThisWeek={dueThisWeek}
+      initialNoDeadline={noDeadline}
+      initialUnassignedOnly={unassignedOnly}
       initialArchived={archived}
       initialSort={sort}
       initialView={view}

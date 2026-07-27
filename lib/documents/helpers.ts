@@ -1,9 +1,14 @@
 import {
   COMPLETED_DOCUMENT_TASK_STATUSES,
   DEFAULT_DOCUMENT_PAYMENT_STATUS,
-  DEFAULT_DOCUMENT_PRIORITY,
-  TERMINAL_DOCUMENT_TASK_STATUSES,
 } from "@/lib/constants/documents";
+import {
+  addDaysToPragueDate,
+  getPragueTodayDateString,
+  getPragueWeekEndDateString,
+  getTaskDueDate,
+  isTaskActiveForDeadline,
+} from "@/lib/documents/deadline";
 import { parseChecklistJson } from "@/lib/documents/checklists";
 import {
   calculateOutstandingBalance,
@@ -22,9 +27,12 @@ import type {
   DocumentTaskWithRelations,
 } from "@/lib/types/documents";
 
-export function getTaskDueDate(task: Pick<DocumentTask, "due_date" | "deadline">): string | null {
-  return task.due_date ?? task.deadline ?? null;
-}
+export {
+  getTaskDueDate,
+  addDaysToPragueDate,
+  getPragueTodayDateString,
+  isTaskActiveForDeadline,
+} from "@/lib/documents/deadline";
 
 export function mapDocumentTask(row: Record<string, unknown>): DocumentTask {
   const serviceType =
@@ -110,34 +118,55 @@ export function getDocumentFinanceSummary(
   };
 }
 
-export function isTaskOverdue(task: DocumentTask, today = new Date()): boolean {
-  if (TERMINAL_DOCUMENT_TASK_STATUSES.includes(task.status as never)) return false;
+export function isTaskOverdue(
+  task: DocumentTask,
+  today = getPragueTodayDateString()
+): boolean {
+  if (!isTaskActiveForDeadline(task)) return false;
   const due = getTaskDueDate(task);
   if (!due) return false;
-  const dueDate = new Date(due);
-  dueDate.setHours(23, 59, 59, 999);
-  return dueDate.getTime() < today.getTime();
+  return due < today;
 }
 
-export function isTaskDueToday(task: DocumentTask, today = new Date()): boolean {
+export function isTaskDueToday(
+  task: DocumentTask,
+  today = getPragueTodayDateString()
+): boolean {
+  if (!isTaskActiveForDeadline(task)) return false;
   const due = getTaskDueDate(task);
   if (!due) return false;
-  const dueDate = new Date(due);
-  return (
-    dueDate.getFullYear() === today.getFullYear() &&
-    dueDate.getMonth() === today.getMonth() &&
-    dueDate.getDate() === today.getDate()
-  );
+  return due === today;
 }
 
-export function isTaskDueWithinDays(task: DocumentTask, days: number, today = new Date()) {
+export function isTaskDueWithinDays(
+  task: DocumentTask,
+  days: number,
+  today = getPragueTodayDateString()
+) {
+  if (!isTaskActiveForDeadline(task)) return false;
   const due = getTaskDueDate(task);
   if (!due) return false;
-  const dueDate = new Date(due);
-  const end = new Date(today);
-  end.setDate(end.getDate() + days);
-  end.setHours(23, 59, 59, 999);
-  return dueDate.getTime() >= today.getTime() && dueDate.getTime() <= end.getTime();
+  const end = addDaysToPragueDate(days, today);
+  return due >= today && due <= end;
+}
+
+export function isTaskDueThisWeek(
+  task: DocumentTask,
+  today = getPragueTodayDateString()
+) {
+  if (!isTaskActiveForDeadline(task)) return false;
+  const due = getTaskDueDate(task);
+  if (!due) return false;
+  const weekEnd = getPragueWeekEndDateString(today);
+  return due >= today && due <= weekEnd;
+}
+
+export function isTaskUnassigned(task: Pick<DocumentTask, "assigned_to">) {
+  return !task.assigned_to;
+}
+
+export function hasTaskDeadline(task: Pick<DocumentTask, "due_date" | "deadline">) {
+  return Boolean(getTaskDueDate(task));
 }
 
 export function isTaskActive(task: DocumentTask) {

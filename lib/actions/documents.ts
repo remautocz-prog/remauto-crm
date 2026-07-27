@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { TERMINAL_DOCUMENT_TASK_STATUSES } from "@/lib/constants/documents";
 import { buildChecklistForService } from "@/lib/documents/checklists";
 import {
   buildPaymentFields,
@@ -294,9 +295,16 @@ export async function changeDocumentStatusAction(
   if (input.result_notes?.trim()) {
     update.result_notes = input.result_notes.trim();
   }
+
+  const wasTerminal = TERMINAL_DOCUMENT_TASK_STATUSES.includes(existing.status as never);
+  const isTerminal = TERMINAL_DOCUMENT_TASK_STATUSES.includes(nextStatus as never);
+
   if (nextStatus === "COMPLETED" || nextStatus === "DELIVERED") {
     update.completed_at = existing.completed_at ?? new Date().toISOString().slice(0, 10);
+  } else if (wasTerminal && !isTerminal) {
+    update.completed_at = null;
   }
+
   if (nextStatus === "COMPLETED" && !existing.ready_at) {
     update.ready_at = new Date().toISOString();
   }
@@ -331,6 +339,60 @@ export async function updateDocumentTaskPriorityAction(
   const { error } = await supabase
     .from("document_tasks")
     .update({ priority: nextPriority })
+    .eq("id", id);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidatePath("/documents");
+  revalidatePath(`/documents/${id}`);
+  revalidatePath("/dashboard");
+  if (existing.client_id) revalidatePath(`/clients/${existing.client_id}`);
+  return { success: true };
+}
+
+export async function updateDocumentTaskAssignmentAction(
+  id: number,
+  assignedTo: string | null
+): Promise<ActionResult> {
+  const existing = await getDocumentTaskById(id);
+  if (!existing) {
+    const t = await getTranslations("documents");
+    return { success: false, error: t("taskNotFound") };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("document_tasks")
+    .update({ assigned_to: assignedTo })
+    .eq("id", id);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidatePath("/documents");
+  revalidatePath(`/documents/${id}`);
+  revalidatePath("/dashboard");
+  if (existing.client_id) revalidatePath(`/clients/${existing.client_id}`);
+  return { success: true };
+}
+
+export async function updateDocumentTaskDeadlineAction(
+  id: number,
+  dueDate: string | null
+): Promise<ActionResult> {
+  const existing = await getDocumentTaskById(id);
+  if (!existing) {
+    const t = await getTranslations("documents");
+    return { success: false, error: t("taskNotFound") };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("document_tasks")
+    .update({ due_date: dueDate })
     .eq("id", id);
 
   if (error) {

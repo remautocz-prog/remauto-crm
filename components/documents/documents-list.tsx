@@ -20,14 +20,14 @@ import { getDocumentVehicleTitle } from "@/lib/documents/vehicle";
 import { getClientDisplayName } from "@/lib/clients/validation";
 import {
   getDocumentFinanceSummary,
-  getTaskDueDate,
-  isTaskOverdue,
 } from "@/lib/documents/helpers";
 import { DocumentTaskFormDialog } from "@/components/documents/document-task-form-dialog";
 import { DocumentsKanban } from "@/components/documents/documents-kanban";
 import { DocumentQuickPayControl } from "@/components/documents/document-quick-pay-control";
 import { DocumentPaymentStatusBadge } from "@/components/documents/document-payment-status-badge";
 import { DocumentInlinePrioritySelect } from "@/components/documents/document-inline-priority-select";
+import { DocumentInlineAssigneeSelect } from "@/components/documents/document-inline-assignee-select";
+import { DocumentInlineDeadlineEditor } from "@/components/documents/document-inline-deadline-editor";
 import { DocumentInlineStatusSelect, type DocumentListToast } from "@/components/documents/document-inline-status-select";
 import { DOCUMENT_PRIORITY_ROW_ACCENT, normalizeDocumentPriority } from "@/lib/documents/priority-styles";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,6 @@ import {
 import { useFormatters } from "@/lib/hooks/use-formatters";
 import {
   bindDocumentServiceTranslator,
-  translateDocumentPaymentStatus,
   translateDocumentService,
 } from "@/lib/i18n/documents";
 import { cn } from "@/lib/utils";
@@ -53,18 +52,22 @@ const SORT_LABEL_KEYS: Record<
   | "newest"
   | "oldest"
   | "closestDeadline"
+  | "sortDeadlineLatest"
   | "overdueFirst"
   | "highestPrice"
   | "clientName"
+  | "sortEmployee"
   | "priorityHighFirst"
   | "priorityLowFirst"
 > = {
   newest: "newest",
   oldest: "oldest",
   closest_deadline: "closestDeadline",
+  deadline_latest: "sortDeadlineLatest",
   overdue_first: "overdueFirst",
   highest_price: "highestPrice",
   client_name: "clientName",
+  employee_name: "sortEmployee",
   priority_high_first: "priorityHighFirst",
   priority_low_first: "priorityLowFirst",
 };
@@ -82,6 +85,10 @@ type DocumentsListProps = {
   initialAssignedTo: string;
   initialPaymentStatus: string;
   initialOverdue: boolean;
+  initialDueToday: boolean;
+  initialDueThisWeek: boolean;
+  initialNoDeadline: boolean;
+  initialUnassignedOnly: boolean;
   initialArchived: boolean;
   initialSort: string;
   initialView: "table" | "kanban";
@@ -118,11 +125,19 @@ export function DocumentsList(props: DocumentsListProps) {
   const [assignedTo, setAssignedTo] = useState(props.initialAssignedTo);
   const [paymentStatus, setPaymentStatus] = useState(props.initialPaymentStatus);
   const [overdue, setOverdue] = useState(props.initialOverdue);
+  const [dueToday, setDueToday] = useState(props.initialDueToday);
+  const [dueThisWeek, setDueThisWeek] = useState(props.initialDueThisWeek);
+  const [noDeadline, setNoDeadline] = useState(props.initialNoDeadline);
+  const [unassignedOnly, setUnassignedOnly] = useState(props.initialUnassignedOnly);
   const [archived, setArchived] = useState(props.initialArchived);
   const [sort, setSort] = useState(props.initialSort);
   const [view, setView] = useState<"table" | "kanban">(props.initialView);
   const [statusOverrides, setStatusOverrides] = useState<Record<number, string>>({});
   const [priorityOverrides, setPriorityOverrides] = useState<Record<number, string>>({});
+  const [assigneeOverrides, setAssigneeOverrides] = useState<
+    Record<number, { id: string | null; name: string | null }>
+  >({});
+  const [deadlineOverrides, setDeadlineOverrides] = useState<Record<number, string | null>>({});
   const [toast, setToast] = useState<DocumentListToast | null>(null);
 
   function showToast(next: DocumentListToast) {
@@ -144,6 +159,36 @@ export function DocumentsList(props: DocumentsListProps) {
 
   function getTaskPriority(task: DocumentTaskWithRelations) {
     return priorityOverrides[task.id] ?? task.priority;
+  }
+
+  function handleAssignmentChange(
+    taskId: number,
+    assignedTo: string | null,
+    assigneeName: string | null
+  ) {
+    setAssigneeOverrides((prev) => ({
+      ...prev,
+      [taskId]: { id: assignedTo, name: assigneeName },
+    }));
+  }
+
+  function getTaskAssignee(task: DocumentTaskWithRelations) {
+    const override = assigneeOverrides[task.id];
+    if (override) {
+      return { id: override.id, full_name: override.name };
+    }
+    return task.assignee ?? null;
+  }
+
+  function handleDeadlineChange(taskId: number, dueDate: string | null) {
+    setDeadlineOverrides((prev) => ({ ...prev, [taskId]: dueDate }));
+  }
+
+  function getTaskDeadline(task: DocumentTaskWithRelations) {
+    if (task.id in deadlineOverrides) {
+      return deadlineOverrides[task.id];
+    }
+    return task.due_date ?? task.deadline ?? null;
   }
 
   function getRowAccentClass(task: DocumentTaskWithRelations) {
@@ -173,6 +218,10 @@ export function DocumentsList(props: DocumentsListProps) {
       assigned_to: String(next.assigned_to ?? assignedTo),
       payment_status: String(next.payment_status ?? paymentStatus),
       overdue: Boolean(next.overdue ?? overdue),
+      due_today: Boolean(next.due_today ?? dueToday),
+      due_this_week: Boolean(next.due_this_week ?? dueThisWeek),
+      no_deadline: Boolean(next.no_deadline ?? noDeadline),
+      unassigned_only: Boolean(next.unassigned_only ?? unassignedOnly),
       archived: Boolean(next.archived ?? archived),
       sort: String(next.sort ?? sort),
       view: String(next.view ?? view),
@@ -185,12 +234,38 @@ export function DocumentsList(props: DocumentsListProps) {
     if (values.assigned_to !== "all") params.set("assigned_to", values.assigned_to);
     if (values.payment_status !== "all") params.set("payment_status", values.payment_status);
     if (values.overdue) params.set("overdue", "1");
+    if (values.due_today) params.set("due_today", "1");
+    if (values.due_this_week) params.set("due_this_week", "1");
+    if (values.no_deadline) params.set("no_deadline", "1");
+    if (values.unassigned_only) params.set("unassigned_only", "1");
     if (values.archived) params.set("archived", "1");
     if (values.sort !== "newest") params.set("sort", values.sort);
     if (values.view !== "table") params.set("view", values.view);
     if (props.initialClientId) params.set("client_id", String(props.initialClientId));
 
     startTransition(() => {
+      router.push(`/documents${params.toString() ? `?${params.toString()}` : ""}`);
+    });
+  }
+
+  function clearFilters() {
+    setQuery("");
+    setStatus("all");
+    setPriority("all");
+    setServiceType("all");
+    setAssignedTo("all");
+    setPaymentStatus("all");
+    setOverdue(false);
+    setDueToday(false);
+    setDueThisWeek(false);
+    setNoDeadline(false);
+    setUnassignedOnly(false);
+    setArchived(false);
+    setSort("newest");
+    startTransition(() => {
+      const params = new URLSearchParams();
+      if (props.initialClientId) params.set("client_id", String(props.initialClientId));
+      if (view !== "table") params.set("view", view);
       router.push(`/documents${params.toString() ? `?${params.toString()}` : ""}`);
     });
   }
@@ -205,6 +280,10 @@ export function DocumentsList(props: DocumentsListProps) {
           props.initialAssignedTo !== "all" ||
           props.initialPaymentStatus !== "all" ||
           props.initialOverdue ||
+          props.initialDueToday ||
+          props.initialDueThisWeek ||
+          props.initialNoDeadline ||
+          props.initialUnassignedOnly ||
           props.initialArchived ||
           props.initialSort !== "newest"
       ),
@@ -297,7 +376,7 @@ export function DocumentsList(props: DocumentsListProps) {
             ))}
           </FilterSelect>
 
-          <FilterSelect label={tFields("manager")} value={assignedTo} onChange={setAssignedTo} onApply={(v) => applyFilters({ assigned_to: v })}>
+          <FilterSelect label={t("responsibleEmployee")} value={assignedTo} onChange={setAssignedTo} onApply={(v) => applyFilters({ assigned_to: v })}>
             <SelectItem value="all">{t("allAssignees")}</SelectItem>
             <SelectItem value="unassigned">{t("unassigned")}</SelectItem>
             {props.assignees.map((person) => (
@@ -336,6 +415,22 @@ export function DocumentsList(props: DocumentsListProps) {
               {t("overdueOnly")}
             </label>
             <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={dueToday} onChange={(e) => { setDueToday(e.target.checked); applyFilters({ due_today: e.target.checked }); }} />
+              {t("dueToday")}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={dueThisWeek} onChange={(e) => { setDueThisWeek(e.target.checked); applyFilters({ due_this_week: e.target.checked }); }} />
+              {t("dueThisWeek")}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={noDeadline} onChange={(e) => { setNoDeadline(e.target.checked); applyFilters({ no_deadline: e.target.checked }); }} />
+              {t("noDeadline")}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={unassignedOnly} onChange={(e) => { setUnassignedOnly(e.target.checked); applyFilters({ unassigned_only: e.target.checked }); }} />
+              {t("unassignedOnly")}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
               <input type="checkbox" checked={archived} onChange={(e) => { setArchived(e.target.checked); applyFilters({ archived: e.target.checked }); }} />
               {t("archivedOnly")}
             </label>
@@ -343,6 +438,11 @@ export function DocumentsList(props: DocumentsListProps) {
               {isPending ? <Loader2 className="animate-spin" /> : null}
               {tActions("applyFilters")}
             </Button>
+            {hasFilters ? (
+              <Button variant="outline" onClick={clearFilters} disabled={isPending}>
+                {t("clearFilters")}
+              </Button>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -376,11 +476,11 @@ export function DocumentsList(props: DocumentsListProps) {
                   <th className="px-4 py-3 font-medium">{tFields("client")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("car")}</th>
                   <th className="px-4 py-3 font-medium">{t("servicesTitle")}</th>
-                  <th className="px-4 py-3 font-medium">{tFields("manager")}</th>
+                  <th className="px-4 py-3 font-medium">{t("responsibleEmployee")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("status")}</th>
                   <th className="px-4 py-3 font-medium">{t("priorityLabel")}</th>
                   <th className="px-4 py-3 font-medium">{t("startDate")}</th>
-                  <th className="px-4 py-3 font-medium">{t("dueDate")}</th>
+                  <th className="px-4 py-3 font-medium">{t("deadline")}</th>
                   <th className="px-4 py-3 font-medium">{t("totalPrice")}</th>
                   <th className="px-4 py-3 font-medium">{t("paidAmount")}</th>
                   <th className="px-4 py-3 font-medium">{t("debt")}</th>
@@ -391,7 +491,12 @@ export function DocumentsList(props: DocumentsListProps) {
               <tbody>
                 {props.tasks.map((task) => {
                   const finance = getDocumentFinanceSummary(task);
-                  const overdueTask = isTaskOverdue(task);
+                  const assignee = getTaskAssignee(task);
+                  const deadlineTask = {
+                    ...task,
+                    due_date: getTaskDeadline(task),
+                    deadline: null,
+                  };
                   return (
                     <tr key={task.id} className={cn("border-t border-zinc-800/80 hover:bg-zinc-900/50", getRowAccentClass(task))}>
                       <td className="px-4 py-3">
@@ -410,7 +515,17 @@ export function DocumentsList(props: DocumentsListProps) {
                       <td className="px-4 py-3 text-zinc-300">
                         {getServicesSummary(task, formatCurrency, t)}
                       </td>
-                      <td className="px-4 py-3 text-zinc-300">{task.assignee?.full_name ?? t("unassigned")}</td>
+                      <td className="px-4 py-3">
+                        <DocumentInlineAssigneeSelect
+                          key={`assignee-${task.id}-${assignee?.id ?? "none"}-${assignee?.full_name ?? ""}`}
+                          taskId={task.id}
+                          assignedTo={assignee?.id ?? task.assigned_to}
+                          assigneeName={assignee?.full_name}
+                          profiles={props.profiles}
+                          onAssignmentChange={handleAssignmentChange}
+                          onToast={showToast}
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <DocumentInlineStatusSelect
                           taskId={task.id}
@@ -428,9 +543,14 @@ export function DocumentsList(props: DocumentsListProps) {
                         />
                       </td>
                       <td className="px-4 py-3 text-zinc-300">{formatDate(task.started_at, dash)}</td>
-                      <td className={`px-4 py-3 ${overdueTask ? "font-medium text-red-400" : "text-zinc-300"}`}>
-                        {formatDate(getTaskDueDate(task), dash)}
-                        {overdueTask ? ` (${t("overdue")})` : ""}
+                      <td className="px-4 py-3">
+                        <DocumentInlineDeadlineEditor
+                          key={`deadline-${task.id}-${getTaskDeadline(task) ?? "none"}`}
+                          taskId={task.id}
+                          task={deadlineTask}
+                          onDeadlineChange={handleDeadlineChange}
+                          onToast={showToast}
+                        />
                       </td>
                       <td className="px-4 py-3 text-zinc-300">{formatCurrency(finance.servicePrice)}</td>
                       <td className="px-4 py-3 text-zinc-300">{formatCurrency(finance.paidAmount)}</td>
@@ -451,7 +571,12 @@ export function DocumentsList(props: DocumentsListProps) {
           <div className="grid gap-4 lg:hidden">
             {props.tasks.map((task) => {
               const finance = getDocumentFinanceSummary(task);
-              const overdueTask = isTaskOverdue(task);
+              const assignee = getTaskAssignee(task);
+              const deadlineTask = {
+                ...task,
+                due_date: getTaskDeadline(task),
+                deadline: null,
+              };
               return (
                 <Card key={task.id} className={cn("border-zinc-800 bg-zinc-900/60", getRowAccentClass(task))}>
                   <CardHeader>
@@ -480,7 +605,32 @@ export function DocumentsList(props: DocumentsListProps) {
                         onToast={showToast}
                         className="min-w-0 w-full sm:w-auto"
                       />
-                      {overdueTask ? <span className="text-red-400">{t("overdue")}</span> : null}
+                    </div>
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-zinc-500">{t("responsibleEmployee")}</span>
+                        <DocumentInlineAssigneeSelect
+                          key={`assignee-mobile-${task.id}-${assignee?.id ?? "none"}-${assignee?.full_name ?? ""}`}
+                          taskId={task.id}
+                          assignedTo={assignee?.id ?? task.assigned_to}
+                          assigneeName={assignee?.full_name}
+                          profiles={props.profiles}
+                          onAssignmentChange={handleAssignmentChange}
+                          onToast={showToast}
+                          className="max-w-[14rem]"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-zinc-500">{t("deadline")}</span>
+                        <DocumentInlineDeadlineEditor
+                          key={`deadline-mobile-${task.id}-${getTaskDeadline(task) ?? "none"}`}
+                          taskId={task.id}
+                          task={deadlineTask}
+                          onDeadlineChange={handleDeadlineChange}
+                          onToast={showToast}
+                          className="max-w-[14rem]"
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <DocumentPaymentStatusBadge status={finance.paymentStatus} />

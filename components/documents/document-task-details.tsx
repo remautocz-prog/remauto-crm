@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,10 +18,11 @@ import type { ClientOption, Profile } from "@/lib/types/cars";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 import { getClientDisplayName } from "@/lib/clients/validation";
 import {
-  getTaskDueDate,
   isTaskArchived,
-  isTaskOverdue,
 } from "@/lib/documents/helpers";
+import { DocumentDeadlineDisplay } from "@/components/documents/document-deadline-display";
+import { DocumentInlineAssigneeSelect } from "@/components/documents/document-inline-assignee-select";
+import { DocumentInlineDeadlineEditor } from "@/components/documents/document-inline-deadline-editor";
 import {
   getDocumentVehicleSnapshot,
   getDocumentVehicleTitle,
@@ -52,7 +54,13 @@ type DocumentTaskDetailsProps = {
   profiles: Profile[];
 };
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
   return (
     <div className="flex justify-between gap-4 border-b border-zinc-800/80 py-3 last:border-0">
       <span className="text-zinc-500">{label}</span>
@@ -72,6 +80,9 @@ export function DocumentTaskDetails({
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [priority, setPriority] = useState(task.priority);
+  const [assignedTo, setAssignedTo] = useState(task.assigned_to);
+  const [assigneeName, setAssigneeName] = useState(task.assignee?.full_name ?? null);
+  const [dueDate, setDueDate] = useState(task.due_date ?? task.deadline ?? null);
   const [toast, setToast] = useState<DocumentListToast | null>(null);
 
   const t = useTranslations("documents");
@@ -79,10 +90,14 @@ export function DocumentTaskDetails({
   const tFields = useTranslations("fields");
   const tCommon = useTranslations("common");
   const tServices = useTranslations("documents.services");
-  const { formatDate } = useFormatters();
+  const { formatDate, formatDateTime } = useFormatters();
   const dash = tCommon("dash");
-  const overdue = isTaskOverdue(task);
   const archived = isTaskArchived(task);
+  const deadlineTask = {
+    ...task,
+    due_date: dueDate,
+    deadline: null,
+  };
 
   const serviceLabel =
     task.service_type === "custom"
@@ -145,7 +160,6 @@ export function DocumentTaskDetails({
                 onPriorityChange={(_id, next) => setPriority(next)}
                 onToast={showToast}
               />
-              {overdue ? <span className="text-sm font-medium text-red-400">{t("overdue")}</span> : null}
               {archived ? <span className="text-sm text-zinc-400">{t("archived")}</span> : null}
             </div>
             <p className="text-zinc-400">{serviceLabel}</p>
@@ -212,12 +226,42 @@ export function DocumentTaskDetails({
               label={t("vehicleModeLabel")}
               value={vehicle.mode === "crm" ? t("vehicleModeCrm") : t("vehicleModeExternal")}
             />
-            <InfoRow label={tFields("manager")} value={task.assignee?.full_name ?? t("unassigned")} />
-            <InfoRow label={t("startDate")} value={formatDate(task.started_at, dash)} />
             <InfoRow
-              label={t("dueDate")}
-              value={`${formatDate(getTaskDueDate(task), dash)}${overdue ? ` (${t("overdue")})` : ""}`}
+              label={t("responsibleEmployee")}
+              value={
+                <DocumentInlineAssigneeSelect
+                  taskId={task.id}
+                  assignedTo={assignedTo}
+                  assigneeName={assigneeName}
+                  profiles={profiles}
+                  onAssignmentChange={(_id, nextAssignedTo, nextName) => {
+                    setAssignedTo(nextAssignedTo);
+                    setAssigneeName(nextName);
+                  }}
+                  onToast={showToast}
+                />
+              }
             />
+            <InfoRow
+              label={t("deadline")}
+              value={
+                <DocumentInlineDeadlineEditor
+                  taskId={task.id}
+                  task={deadlineTask}
+                  onDeadlineChange={(_id, nextDueDate) => setDueDate(nextDueDate)}
+                  onToast={showToast}
+                />
+              }
+            />
+            <InfoRow
+              label={t("deadlineState")}
+              value={<DocumentDeadlineDisplay task={deadlineTask} showStateLabel />}
+            />
+            <InfoRow label={t("createdDate")} value={formatDateTime(task.created_at, dash)} />
+            <InfoRow label={t("startDate")} value={formatDate(task.started_at, dash)} />
+            <InfoRow label={t("readyDate")} value={formatDateTime(task.ready_at, dash)} />
+            <InfoRow label={t("deliveredDate")} value={formatDateTime(task.delivered_at, dash)} />
+            <InfoRow label={t("completedDate")} value={formatDate(task.completed_at, dash)} />
             {task.notes ? (
               <div className="border-t border-zinc-800/80 pt-3">
                 <p className="text-zinc-500">{tFields("notes")}</p>

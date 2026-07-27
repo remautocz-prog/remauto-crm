@@ -9,6 +9,8 @@ import { getCarBusinessStats } from "@/lib/queries/car-business-stats";
 import {
   getDocumentDashboardAlerts,
   getDocumentDashboardMetrics,
+  getDocumentEmployeeWorkload,
+  getDocumentTodaysWork,
 } from "@/lib/queries/documents";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -18,11 +20,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 async function DashboardContent() {
-  const [stats, businessStats, user, documentMetrics, t, tDocuments] = await Promise.all([
+  const [stats, businessStats, user, documentMetrics, todaysWork, employeeWorkload, t, tDocuments] =
+    await Promise.all([
     getDashboardStats(),
     getCarBusinessStats(),
     getCurrentUser(),
     getDocumentDashboardMetrics(),
+    getDocumentTodaysWork(),
+    getDocumentEmployeeWorkload(),
     getTranslations("dashboard"),
     getTranslations("documents.dashboard"),
   ]);
@@ -51,7 +56,12 @@ async function DashboardContent() {
 
       <DashboardStatsCards stats={stats} businessStats={businessStats} />
 
-      <DocumentDashboardPanel metrics={documentMetrics} alerts={documentAlerts} />
+      <DocumentDashboardPanel
+        metrics={documentMetrics}
+        alerts={documentAlerts}
+        todaysWork={todaysWork}
+        employeeWorkload={employeeWorkload}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="border-zinc-800 bg-zinc-900/60">

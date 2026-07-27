@@ -7,27 +7,37 @@ import {
 import {
   derivePaymentStatus,
   getDocumentFinanceSummary,
-  getTaskDueDate,
   getTaskServiceLabel,
+  hasTaskDeadline,
   isCompletedButUnpaid,
   isReadyForDelivery,
   isTaskActive,
+  isTaskActiveForDeadline,
   isTaskArchived,
+  isTaskDueThisWeek,
   isTaskDueToday,
   isTaskDueWithinDays,
   isTaskOverdue,
+  isTaskUnassigned,
   mapDocumentTask,
   mergeTaskRelations,
 } from "@/lib/documents/helpers";
+import {
+  compareDeadlineLatest,
+  compareDeadlineNearest,
+  getPragueTodayDateString,
+} from "@/lib/documents/deadline";
 import { comparePriority } from "@/lib/documents/priority-styles";
 import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
 import { getClientDisplayName } from "@/lib/clients/validation";
 import type {
   DocumentDashboardAlert,
   DocumentDashboardMetrics,
+  DocumentEmployeeWorkload,
   DocumentTask,
   DocumentTasksListParams,
   DocumentTaskWithRelations,
+  DocumentTodaysWorkItem,
 } from "@/lib/types/documents";
 
 const TASK_SELECT = `
@@ -89,31 +99,28 @@ function matchesSearch(task: DocumentTaskWithRelations, q: string) {
 
 function sortTasks(tasks: DocumentTaskWithRelations[], sort?: string) {
   const copy = [...tasks];
+  const today = getPragueTodayDateString();
   switch (sort) {
     case "oldest":
       return copy.sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
     case "closest_deadline":
-      return copy.sort((a, b) => {
-        const aDue = getTaskDueDate(a);
-        const bDue = getTaskDueDate(b);
-        if (!aDue && !bDue) return 0;
-        if (!aDue) return 1;
-        if (!bDue) return -1;
-        return new Date(aDue).getTime() - new Date(bDue).getTime();
-      });
+      return copy.sort((a, b) => compareDeadlineNearest(a, b, today));
+    case "deadline_latest":
+      return copy.sort((a, b) => compareDeadlineLatest(a, b));
     case "overdue_first":
       return copy.sort((a, b) => {
-        const aOverdue = isTaskOverdue(a) ? 1 : 0;
-        const bOverdue = isTaskOverdue(b) ? 1 : 0;
+        const aOverdue = isTaskOverdue(a, today) ? 1 : 0;
+        const bOverdue = isTaskOverdue(b, today) ? 1 : 0;
         if (aOverdue !== bOverdue) return bOverdue - aOverdue;
-        const aDue = getTaskDueDate(a);
-        const bDue = getTaskDueDate(b);
-        if (!aDue && !bDue) return 0;
-        if (!aDue) return 1;
-        if (!bDue) return -1;
-        return new Date(aDue).getTime() - new Date(bDue).getTime();
+        return compareDeadlineNearest(a, b, today);
+      });
+    case "employee_name":
+      return copy.sort((a, b) => {
+        const aName = a.assignee?.full_name?.trim() || "\uffff";
+        const bName = b.assignee?.full_name?.trim() || "\uffff";
+        return aName.localeCompare(bName);
       });
     case "highest_price":
       return copy.sort((a, b) => {
@@ -187,6 +194,22 @@ export async function getDocumentTasks(
 
   if (params.overdue) {
     tasks = tasks.filter((task) => isTaskOverdue(task));
+  }
+
+  if (params.due_today) {
+    tasks = tasks.filter((task) => isTaskDueToday(task));
+  }
+
+  if (params.due_this_week) {
+    tasks = tasks.filter((task) => isTaskDueThisWeek(task));
+  }
+
+  if (params.no_deadline) {
+    tasks = tasks.filter((task) => !hasTaskDeadline(task));
+  }
+
+  if (params.unassigned_only) {
+    tasks = tasks.filter((task) => isTaskUnassigned(task));
   }
 
   return sortTasks(tasks, params.sort);
@@ -306,6 +329,13 @@ export async function getDocumentDashboardMetrics(): Promise<DocumentDashboardMe
     ).length,
     newTasks: tasks.filter((task) => task.status === "NEW").length,
     overdueTasks: tasks.filter((task) => isTaskOverdue(task)).length,
+    dueTodayTasks: tasks.filter((task) => isTaskDueToday(task)).length,
+    unassignedActiveTasks: tasks.filter(
+      (task) =>
+        isTaskUnassigned(task) &&
+        isTaskActiveForDeadline(task) &&
+        ACTIVE_DOCUMENT_TASK_STATUSES.includes(task.status as never)
+    ).length,
     waitingClient: tasks.filter((task) => task.status === "WAITING_CLIENT").length,
     waitingOffice: tasks.filter((task) => task.status === "WAITING_OFFICE").length,
     urgentActiveTasks: tasks.filter(
@@ -398,6 +428,94 @@ export async function getDocumentDashboardAlerts(
   }
 
   return alerts.slice(0, 20);
+}
+
+function isActiveDashboardTask(task: DocumentTask) {
+  return (
+    !task.archived_at &&
+    isTaskActiveForDeadline(task) &&
+    ACTIVE_DOCUMENT_TASK_STATUSES.includes(task.status as never)
+  );
+}
+
+function compareTodaysWork(
+  a: DocumentTaskWithRelations,
+  b: DocumentTaskWithRelations,
+  today: string
+) {
+  const overdueDiff =
+    Number(isTaskOverdue(b, today)) - Number(isTaskOverdue(a, today));
+  if (overdueDiff !== 0) return overdueDiff;
+
+  const dueTodayDiff =
+    Number(isTaskDueToday(b, today)) - Number(isTaskDueToday(a, today));
+  if (dueTodayDiff !== 0) return dueTodayDiff;
+
+  const urgentDiff =
+    Number(b.priority === "urgent") - Number(a.priority === "urgent");
+  if (urgentDiff !== 0) return urgentDiff;
+
+  return compareDeadlineNearest(a, b, today);
+}
+
+export async function getDocumentTodaysWork(
+  limit = 10
+): Promise<DocumentTodaysWorkItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("document_tasks")
+    .select(TASK_SELECT)
+    .is("archived_at", null);
+
+  if (error) throw error;
+
+  const today = getPragueTodayDateString();
+  const tasks = (data ?? [])
+    .map((row) => mapRow(row as Record<string, unknown>))
+    .filter(isActiveDashboardTask)
+    .sort((a, b) => compareTodaysWork(a, b, today));
+
+  return tasks.slice(0, limit);
+}
+
+export async function getDocumentEmployeeWorkload(): Promise<DocumentEmployeeWorkload[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("document_tasks")
+    .select(TASK_SELECT)
+    .is("archived_at", null);
+
+  if (error) throw error;
+
+  const tasks = (data ?? [])
+    .map((row) => mapRow(row as Record<string, unknown>))
+    .filter(isActiveDashboardTask);
+
+  const workload = new Map<string, DocumentEmployeeWorkload>();
+
+  for (const task of tasks) {
+    if (!task.assigned_to) continue;
+    const employeeId = task.assigned_to;
+    const existing = workload.get(employeeId) ?? {
+      employeeId,
+      employeeName: task.assignee?.full_name?.trim() || employeeId,
+      activeOrders: 0,
+      overdueOrders: 0,
+      dueTodayOrders: 0,
+      urgentOrders: 0,
+    };
+
+    existing.activeOrders += 1;
+    if (isTaskOverdue(task)) existing.overdueOrders += 1;
+    if (isTaskDueToday(task)) existing.dueTodayOrders += 1;
+    if (task.priority === "urgent") existing.urgentOrders += 1;
+
+    workload.set(employeeId, existing);
+  }
+
+  return Array.from(workload.values()).sort((a, b) =>
+    a.employeeName.localeCompare(b.employeeName)
+  );
 }
 
 export async function getClientDocumentSummary(clientId: number) {

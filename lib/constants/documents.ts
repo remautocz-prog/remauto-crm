@@ -121,9 +121,11 @@ export const DOCUMENT_SORT_VALUES = [
   "newest",
   "oldest",
   "closest_deadline",
+  "deadline_latest",
   "overdue_first",
   "highest_price",
   "client_name",
+  "employee_name",
   "priority_high_first",
   "priority_low_first",
 ] as const;
