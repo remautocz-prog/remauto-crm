@@ -31,7 +31,8 @@ import { AttachmentsPlaceholder } from "@/components/documents/attachments-place
 import { DocumentChecklist } from "@/components/documents/document-checklist";
 import { DocumentTaskFinancePanel } from "@/components/documents/document-task-finance-panel";
 import { DocumentTaskServicesTable } from "@/components/documents/document-task-services-table";
-import { DocumentPriorityBadge } from "@/components/documents/document-priority-badge";
+import { DocumentInlinePrioritySelect } from "@/components/documents/document-inline-priority-select";
+import type { DocumentListToast } from "@/components/documents/document-inline-status-select";
 import { DocumentStatusBadge } from "@/components/documents/document-status-badge";
 import { DocumentTaskFormDialog } from "@/components/documents/document-task-form-dialog";
 import { PaymentDialog } from "@/components/documents/payment-dialog";
@@ -70,6 +71,8 @@ export function DocumentTaskDetails({
   const [editOpen, setEditOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [priority, setPriority] = useState(task.priority);
+  const [toast, setToast] = useState<DocumentListToast | null>(null);
 
   const t = useTranslations("documents");
   const tActions = useTranslations("actions");
@@ -105,8 +108,25 @@ export function DocumentTaskDetails({
     window.print();
   }
 
+  function showToast(next: DocumentListToast) {
+    setToast(next);
+    window.setTimeout(() => setToast(null), 3000);
+  }
+
   return (
     <div className="space-y-6">
+      {toast ? (
+        <div
+          className={`fixed bottom-4 right-4 z-50 rounded-lg border px-4 py-3 text-sm shadow-lg ${
+            toast.type === "success"
+              ? "border-green-500/30 bg-green-950 text-green-200"
+              : "border-red-500/30 bg-red-950 text-red-200"
+          }`}
+          role="status"
+        >
+          {toast.message}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between print:hidden">
         <div className="space-y-3">
           <Button asChild variant="ghost" className="px-0 text-zinc-400 hover:text-white">
@@ -119,7 +139,12 @@ export function DocumentTaskDetails({
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-bold text-white">#{task.id}</h2>
               <DocumentStatusBadge status={task.status} />
-              <DocumentPriorityBadge priority={task.priority} />
+              <DocumentInlinePrioritySelect
+                taskId={task.id}
+                priority={priority}
+                onPriorityChange={(_id, next) => setPriority(next)}
+                onToast={showToast}
+              />
               {overdue ? <span className="text-sm font-medium text-red-400">{t("overdue")}</span> : null}
               {archived ? <span className="text-sm text-zinc-400">{t("archived")}</span> : null}
             </div>

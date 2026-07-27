@@ -27,8 +27,9 @@ import { DocumentTaskFormDialog } from "@/components/documents/document-task-for
 import { DocumentsKanban } from "@/components/documents/documents-kanban";
 import { DocumentQuickPayControl } from "@/components/documents/document-quick-pay-control";
 import { DocumentPaymentStatusBadge } from "@/components/documents/document-payment-status-badge";
-import { DocumentInlineStatusSelect, type DocumentStatusToast } from "@/components/documents/document-inline-status-select";
-import { DocumentPriorityBadge } from "@/components/documents/document-priority-badge";
+import { DocumentInlinePrioritySelect } from "@/components/documents/document-inline-priority-select";
+import { DocumentInlineStatusSelect, type DocumentListToast } from "@/components/documents/document-inline-status-select";
+import { DOCUMENT_PRIORITY_ROW_ACCENT, normalizeDocumentPriority } from "@/lib/documents/priority-styles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,10 +46,18 @@ import {
   translateDocumentPaymentStatus,
   translateDocumentService,
 } from "@/lib/i18n/documents";
+import { cn } from "@/lib/utils";
 
 const SORT_LABEL_KEYS: Record<
   DocumentSortValue,
-  "newest" | "oldest" | "closestDeadline" | "overdueFirst" | "highestPrice" | "clientName"
+  | "newest"
+  | "oldest"
+  | "closestDeadline"
+  | "overdueFirst"
+  | "highestPrice"
+  | "clientName"
+  | "priorityHighFirst"
+  | "priorityLowFirst"
 > = {
   newest: "newest",
   oldest: "oldest",
@@ -56,6 +65,8 @@ const SORT_LABEL_KEYS: Record<
   overdue_first: "overdueFirst",
   highest_price: "highestPrice",
   client_name: "clientName",
+  priority_high_first: "priorityHighFirst",
+  priority_low_first: "priorityLowFirst",
 };
 
 type DocumentsListProps = {
@@ -111,9 +122,10 @@ export function DocumentsList(props: DocumentsListProps) {
   const [sort, setSort] = useState(props.initialSort);
   const [view, setView] = useState<"table" | "kanban">(props.initialView);
   const [statusOverrides, setStatusOverrides] = useState<Record<number, string>>({});
-  const [toast, setToast] = useState<DocumentStatusToast | null>(null);
+  const [priorityOverrides, setPriorityOverrides] = useState<Record<number, string>>({});
+  const [toast, setToast] = useState<DocumentListToast | null>(null);
 
-  function showToast(next: DocumentStatusToast) {
+  function showToast(next: DocumentListToast) {
     setToast(next);
     window.setTimeout(() => setToast(null), 3000);
   }
@@ -124,6 +136,19 @@ export function DocumentsList(props: DocumentsListProps) {
 
   function getTaskStatus(task: DocumentTaskWithRelations) {
     return statusOverrides[task.id] ?? task.status;
+  }
+
+  function handlePriorityChange(taskId: number, nextPriority: string) {
+    setPriorityOverrides((prev) => ({ ...prev, [taskId]: nextPriority }));
+  }
+
+  function getTaskPriority(task: DocumentTaskWithRelations) {
+    return priorityOverrides[task.id] ?? task.priority;
+  }
+
+  function getRowAccentClass(task: DocumentTaskWithRelations) {
+    const priority = normalizeDocumentPriority(getTaskPriority(task));
+    return DOCUMENT_PRIORITY_ROW_ACCENT[priority] ?? "";
   }
 
   const t = useTranslations("documents");
@@ -295,6 +320,18 @@ export function DocumentsList(props: DocumentsListProps) {
 
           <div className="flex flex-wrap items-end gap-4 md:col-span-2 xl:col-span-4">
             <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={priority === "urgent"}
+                onChange={(e) => {
+                  const next = e.target.checked ? "urgent" : "all";
+                  setPriority(next);
+                  applyFilters({ priority: next });
+                }}
+              />
+              {t("urgentOnly")}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
               <input type="checkbox" checked={overdue} onChange={(e) => { setOverdue(e.target.checked); applyFilters({ overdue: e.target.checked }); }} />
               {t("overdueOnly")}
             </label>
@@ -356,7 +393,7 @@ export function DocumentsList(props: DocumentsListProps) {
                   const finance = getDocumentFinanceSummary(task);
                   const overdueTask = isTaskOverdue(task);
                   return (
-                    <tr key={task.id} className="border-t border-zinc-800/80 hover:bg-zinc-900/50">
+                    <tr key={task.id} className={cn("border-t border-zinc-800/80 hover:bg-zinc-900/50", getRowAccentClass(task))}>
                       <td className="px-4 py-3">
                         <Link href={`/documents/${task.id}`} className="font-medium text-white hover:text-red-400">
                           #{task.id}
@@ -382,7 +419,14 @@ export function DocumentsList(props: DocumentsListProps) {
                           onToast={showToast}
                         />
                       </td>
-                      <td className="px-4 py-3"><DocumentPriorityBadge priority={task.priority} /></td>
+                      <td className="px-4 py-3">
+                        <DocumentInlinePrioritySelect
+                          taskId={task.id}
+                          priority={getTaskPriority(task)}
+                          onPriorityChange={handlePriorityChange}
+                          onToast={showToast}
+                        />
+                      </td>
                       <td className="px-4 py-3 text-zinc-300">{formatDate(task.started_at, dash)}</td>
                       <td className={`px-4 py-3 ${overdueTask ? "font-medium text-red-400" : "text-zinc-300"}`}>
                         {formatDate(getTaskDueDate(task), dash)}
@@ -409,7 +453,7 @@ export function DocumentsList(props: DocumentsListProps) {
               const finance = getDocumentFinanceSummary(task);
               const overdueTask = isTaskOverdue(task);
               return (
-                <Card key={task.id} className="border-zinc-800 bg-zinc-900/60">
+                <Card key={task.id} className={cn("border-zinc-800 bg-zinc-900/60", getRowAccentClass(task))}>
                   <CardHeader>
                     <CardTitle className="text-base text-white">
                       <Link href={`/documents/${task.id}`} className="hover:text-red-400">
@@ -429,7 +473,13 @@ export function DocumentsList(props: DocumentsListProps) {
                         onToast={showToast}
                         className="min-w-0 w-full sm:w-auto"
                       />
-                      <DocumentPriorityBadge priority={task.priority} />
+                      <DocumentInlinePrioritySelect
+                        taskId={task.id}
+                        priority={getTaskPriority(task)}
+                        onPriorityChange={handlePriorityChange}
+                        onToast={showToast}
+                        className="min-w-0 w-full sm:w-auto"
+                      />
                       {overdueTask ? <span className="text-red-400">{t("overdue")}</span> : null}
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2">

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-export type DocumentStatusToast = {
+export type DocumentListToast = {
   message: string;
   type: "success" | "error";
 };
@@ -29,7 +29,7 @@ type DocumentInlineStatusSelectProps = {
   taskId: number;
   status: string;
   onStatusChange?: (taskId: number, status: DocumentTaskStatus) => void;
-  onToast?: (toast: DocumentStatusToast) => void;
+  onToast?: (toast: DocumentListToast) => void;
   className?: string;
 };
 

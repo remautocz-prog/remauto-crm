@@ -18,6 +18,7 @@ import {
   type DocumentValidationMessageKey,
 } from "@/lib/documents/validation";
 import { getDocumentFinanceSummary, mapDocumentTask } from "@/lib/documents/helpers";
+import { normalizeDocumentPriority } from "@/lib/documents/priority-styles";
 import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
 import { getDocumentTaskById } from "@/lib/queries/documents";
 import { createClient } from "@/lib/supabase/server";
@@ -312,6 +313,34 @@ export async function changeDocumentStatusAction(
   revalidatePath("/documents");
   revalidatePath(`/documents/${id}`);
   revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function updateDocumentTaskPriorityAction(
+  id: number,
+  priority: string
+): Promise<ActionResult> {
+  const existing = await getDocumentTaskById(id);
+  if (!existing) {
+    const t = await getTranslations("documents");
+    return { success: false, error: t("taskNotFound") };
+  }
+
+  const nextPriority = normalizeDocumentPriority(priority);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("document_tasks")
+    .update({ priority: nextPriority })
+    .eq("id", id);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidatePath("/documents");
+  revalidatePath(`/documents/${id}`);
+  revalidatePath("/dashboard");
+  if (existing.client_id) revalidatePath(`/clients/${existing.client_id}`);
   return { success: true };
 }
 

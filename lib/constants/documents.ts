@@ -124,6 +124,8 @@ export const DOCUMENT_SORT_VALUES = [
   "overdue_first",
   "highest_price",
   "client_name",
+  "priority_high_first",
+  "priority_low_first",
 ] as const;
 
 export type DocumentSortValue = (typeof DOCUMENT_SORT_VALUES)[number];

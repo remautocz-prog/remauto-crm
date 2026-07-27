@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   ACTIVE_DOCUMENT_TASK_STATUSES,
   COMPLETED_DOCUMENT_TASK_STATUSES,
+  TERMINAL_DOCUMENT_TASK_STATUSES,
 } from "@/lib/constants/documents";
 import {
   derivePaymentStatus,
@@ -18,6 +19,7 @@ import {
   mapDocumentTask,
   mergeTaskRelations,
 } from "@/lib/documents/helpers";
+import { comparePriority } from "@/lib/documents/priority-styles";
 import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
 import { getClientDisplayName } from "@/lib/clients/validation";
 import type {
@@ -125,6 +127,10 @@ function sortTasks(tasks: DocumentTaskWithRelations[], sort?: string) {
         const bName = b.client ? getClientDisplayName(b.client) : "";
         return aName.localeCompare(bName);
       });
+    case "priority_high_first":
+      return copy.sort((a, b) => comparePriority(a.priority, b.priority, "high_first"));
+    case "priority_low_first":
+      return copy.sort((a, b) => comparePriority(a.priority, b.priority, "low_first"));
     default:
       return copy.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -302,6 +308,11 @@ export async function getDocumentDashboardMetrics(): Promise<DocumentDashboardMe
     overdueTasks: tasks.filter((task) => isTaskOverdue(task)).length,
     waitingClient: tasks.filter((task) => task.status === "WAITING_CLIENT").length,
     waitingOffice: tasks.filter((task) => task.status === "WAITING_OFFICE").length,
+    urgentActiveTasks: tasks.filter(
+      (task) =>
+        task.priority === "urgent" &&
+        !TERMINAL_DOCUMENT_TASK_STATUSES.includes(task.status as never)
+    ).length,
     completedThisMonth: tasks.filter((task) => {
       const completedAt = task.completed_at;
       return (

@@ -206,6 +206,7 @@ export type DocumentDashboardMetrics = {
   overdueTasks: number;
   waitingClient: number;
   waitingOffice: number;
+  urgentActiveTasks: number;
   completedThisMonth: number;
   unpaidBalance: number;
   monthlyRevenue: number;

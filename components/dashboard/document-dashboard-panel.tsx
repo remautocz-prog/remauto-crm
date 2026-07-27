@@ -24,6 +24,7 @@ export function DocumentDashboardPanel({
     { label: t("overdueTasks"), value: formatNumber(metrics.overdueTasks) },
     { label: t("waitingClient"), value: formatNumber(metrics.waitingClient) },
     { label: t("waitingOffice"), value: formatNumber(metrics.waitingOffice) },
+    { label: t("urgentOrders"), value: formatNumber(metrics.urgentActiveTasks) },
     { label: t("completedThisMonth"), value: formatNumber(metrics.completedThisMonth) },
     { label: t("unpaidBalance"), value: formatCurrency(metrics.unpaidBalance) },
     { label: t("monthlyRevenue"), value: formatCurrency(metrics.monthlyRevenue) },

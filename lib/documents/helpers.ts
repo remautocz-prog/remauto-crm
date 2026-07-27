@@ -10,6 +10,7 @@ import {
   derivePaymentStatus,
 } from "@/lib/documents/payment";
 import { resolveTaskPricing, sortDocumentTaskServices } from "@/lib/documents/task-services";
+import { normalizeDocumentPriority } from "@/lib/documents/priority-styles";
 import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
 import {
   resolveDocumentVehicleMode,
@@ -51,7 +52,7 @@ export function mapDocumentTask(row: Record<string, unknown>): DocumentTask {
     custom_service_name: (row.custom_service_name as string | null) ?? null,
     assigned_to: (row.assigned_to as string | null) ?? null,
     status: normalizeDocumentTaskStatus(row.status as string | null | undefined),
-    priority: (row.priority as DocumentTask["priority"]) ?? DEFAULT_DOCUMENT_PRIORITY,
+    priority: normalizeDocumentPriority(row.priority as string | null | undefined),
     started_at: (row.started_at as string | null) ?? null,
     due_date: (row.due_date as string | null) ?? null,
     deadline: (row.deadline as string | null) ?? null,

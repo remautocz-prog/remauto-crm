@@ -335,6 +335,10 @@
     "quickCreateVehicle": "Быстро добавить автомобиль",
     "customServiceName": "Название услуги",
     "priorityLabel": "Приоритет",
+    "priorityUpdated": "Приоритет обновлён",
+    "priorityUpdateFailed": "Не удалось обновить приоритет",
+    "urgentOrders": "Срочные заказы",
+    "urgentOnly": "Только срочные",
     "startDate": "Дата начала",
     "dueDate": "Срок",
     "servicePrice": "Цена услуги",
@@ -412,7 +416,7 @@
       "low": "Низкий",
       "normal": "Обычный",
       "high": "Высокий",
-      "urgent": "Срочный"
+      "urgent": "Срочно"
     },
     "paymentStatus": {
       "unpaid": "Не оплачено",
@@ -431,7 +435,9 @@
       "closestDeadline": "Ближайший срок",
       "overdueFirst": "Сначала просроченные",
       "highestPrice": "Самая высокая цена",
-      "clientName": "По клиенту"
+      "clientName": "По клиенту",
+      "priorityHighFirst": "Сначала срочные",
+      "priorityLowFirst": "Сначала низкий приоритет"
     },
     "legacyService": "Сохранённая устаревшая услуга",
     "searchServices": "Поиск услуги...",
@@ -542,6 +548,7 @@
       "overdueTasks": "Просроченные",
       "waitingClient": "Ожидают клиента",
       "waitingOffice": "Ожидают учреждение",
+      "urgentOrders": "Срочные заказы",
       "completedThisMonth": "Завершено в этом месяце",
       "unpaidBalance": "Неоплаченный остаток",
       "monthlyRevenue": "Доход за месяц",
