@@ -18,6 +18,10 @@ export type Client = {
   preferred_language: ClientPreferredLanguage | null;
   tax_id: string | null;
   vat_id: string | null;
+  birth_date: string | null;
+  personal_id_number: string | null;
+  identity_document_number: string | null;
+  bank_account: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -36,6 +40,10 @@ export type ClientFormInput = {
   preferred_language?: ClientPreferredLanguage | null;
   tax_id?: string | null;
   vat_id?: string | null;
+  birth_date?: string | null;
+  personal_id_number?: string | null;
+  identity_document_number?: string | null;
+  bank_account?: string | null;
   notes?: string | null;
   is_active?: boolean;
 };

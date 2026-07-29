@@ -1,3 +1,4 @@
+import { getDealDashboardMetrics } from "@/lib/queries/deals";
 import { createClient } from "@/lib/supabase/server";
 import {
   calculateCarProfit,
@@ -379,6 +380,14 @@ function emptyDashboardData(
     },
     employeeWorkload: [],
     recentActivity: [],
+    deals: {
+      activeDeals: 0,
+      unsignedPreparedDeals: 0,
+      awaitingPayment: 0,
+      overduePayments: 0,
+      handoversToday: 0,
+      completedThisMonth: 0,
+    },
     errors,
   };
 }
@@ -515,6 +524,20 @@ export async function getOperationsDashboardData(
     limit: 15,
   });
 
+  let deals = {
+    activeDeals: 0,
+    unsignedPreparedDeals: 0,
+    awaitingPayment: 0,
+    overduePayments: 0,
+    handoversToday: 0,
+    completedThisMonth: 0,
+  };
+  try {
+    deals = await getDealDashboardMetrics();
+  } catch (error) {
+    errors.deals = error instanceof Error ? error.message : String(error);
+  }
+
   if (errors.clients || errors.cars || errors.notes) {
     errors.activity = [errors.clients, errors.cars, errors.notes]
       .filter(Boolean)
@@ -529,6 +552,7 @@ export async function getOperationsDashboardData(
     business,
     employeeWorkload,
     recentActivity,
+    deals,
     errors,
   };
 }

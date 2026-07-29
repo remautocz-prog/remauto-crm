@@ -1,4 +1,5 @@
 import type { DashboardPeriod } from "@/lib/dashboard/period";
+import type { DealDashboardMetrics } from "@/lib/types/deals";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 
 export type DashboardAttentionMetrics = {
@@ -85,6 +86,7 @@ export type DashboardSectionErrors = {
   clients?: string;
   notes?: string;
   activity?: string;
+  deals?: string;
 };
 
 export type OperationsDashboardData = {
@@ -95,5 +97,6 @@ export type OperationsDashboardData = {
   business: DashboardBusinessOverview;
   employeeWorkload: DashboardEmployeeWorkloadRow[];
   recentActivity: DashboardActivityItem[];
+  deals: DealDashboardMetrics;
   errors: DashboardSectionErrors;
 };

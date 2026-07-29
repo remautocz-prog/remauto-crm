@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { PageHeader } from "@/components/shared/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/queries/dashboard";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,6 +22,16 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t("title")} description={t("description")} />
+      <Card className="border-zinc-800 bg-zinc-900/60">
+        <CardHeader>
+          <CardTitle className="text-base text-white">{t("documentTemplatesLink")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="secondary">
+            <Link href="/settings/templates">{t("documentTemplatesLink")}</Link>
+          </Button>
+        </CardContent>
+      </Card>
       <Card className="border-zinc-800 bg-zinc-900/60">
         <CardHeader>
           <CardTitle className="text-base text-white">{t("account")}</CardTitle>

@@ -186,12 +186,32 @@ export function clearFieldsForBusinessModel(
   return next;
 }
 
+export function parseOptionalInteger(value: number | null | undefined): number | null {
+  if (value == null || Number.isNaN(value)) return null;
+  return Math.trunc(value);
+}
+
+export function normalizeVinField(value: string | null | undefined): string | null {
+  const trimmed = normalizeOptionalString(value);
+  return trimmed ? trimmed.toUpperCase() : null;
+}
+
 export function normalizeCarPayload(input: CarFormInput) {
   const model = getBusinessModel(input);
 
+  const technicalFields = {
+    first_registration_date: normalizeOptionalDate(input.first_registration_date),
+    fuel_type: normalizeOptionalString(input.fuel_type),
+    engine_capacity: normalizeOptionalString(input.engine_capacity),
+    power_kw: parseOptionalNumber(input.power_kw),
+    technical_certificate_number: normalizeOptionalString(input.technical_certificate_number),
+    key_count: parseOptionalInteger(input.key_count),
+    mileage: parseOptionalInteger(input.mileage),
+  };
+
   const base = {
     stock_number: normalizeOptionalString(input.stock_number),
-    vin: normalizeOptionalString(input.vin),
+    vin: normalizeVinField(input.vin),
     brand: input.brand.trim(),
     model: input.model.trim(),
     year: input.year,
@@ -205,6 +225,7 @@ export function normalizeCarPayload(input: CarFormInput) {
     actual_sale_price: parseOptionalNumber(input.actual_sale_price),
     purchase_date: normalizeOptionalDate(input.purchase_date),
     sale_date: normalizeOptionalDate(input.sale_date),
+    ...technicalFields,
   };
 
   if (model === "owned") {
@@ -691,7 +712,10 @@ export type CarValidationMessageKey =
   | "purchasePriceInvalid"
   | "actualSalePriceRequired"
   | "saleDateRequired"
-  | "salePriceRequiredForPercentage";
+  | "salePriceRequiredForPercentage"
+  | "mileageInvalid"
+  | "powerKwInvalid"
+  | "keyCountInvalid";
 
 export type CarValidationIssue = {
   field: CarField;
@@ -832,6 +856,16 @@ export function collectCarValidationIssues(
     if (isBlankString(input.sale_date)) {
       issues.push({ field: "sale_date", messageKey: "saleDateRequired" });
     }
+  }
+
+  if (input.mileage != null && input.mileage < 0) {
+    issues.push({ field: "mileage", messageKey: "mileageInvalid" });
+  }
+  if (input.power_kw != null && input.power_kw < 0) {
+    issues.push({ field: "power_kw", messageKey: "powerKwInvalid" });
+  }
+  if (input.key_count != null && input.key_count < 0) {
+    issues.push({ field: "key_count", messageKey: "keyCountInvalid" });
   }
 
   return issues;

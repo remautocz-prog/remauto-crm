@@ -28,6 +28,13 @@ export type Car = {
   client_id: number | null;
   manager_id: string | null;
   notes: string | null;
+  first_registration_date: string | null;
+  fuel_type: string | null;
+  engine_capacity: string | null;
+  power_kw: number | null;
+  technical_certificate_number: string | null;
+  key_count: number | null;
+  mileage: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -66,6 +73,13 @@ export type CarFormInput = {
   client_id?: number | null;
   manager_id?: string | null;
   notes?: string | null;
+  first_registration_date?: string | null;
+  fuel_type?: string | null;
+  engine_capacity?: string | null;
+  power_kw?: number | null;
+  technical_certificate_number?: string | null;
+  key_count?: number | null;
+  mileage?: number | null;
 };
 
 export type CarExpenseInput = {

@@ -30,8 +30,12 @@ import { ClientSummaryCards } from "@/components/clients/client-summary-cards";
 import { ClientTypeBadge } from "@/components/clients/client-type-badge";
 import { ClientVehiclesPanel } from "@/components/clients/client-vehicles-panel";
 import { DocumentTaskFormDialog } from "@/components/documents/document-task-form-dialog";
+import { GeneratedDocumentsPanel } from "@/components/document-generator/generated-documents-panel";
+import { DealsSection } from "@/components/deals/deals-section";
 import type { DocumentCarOption } from "@/lib/documents/vehicle";
 import type { ClientOption, Profile } from "@/lib/types/cars";
+import type { DocumentTemplate, GeneratedDocument } from "@/lib/types/document-templates";
+import type { DealWithRelations } from "@/lib/types/deals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFormatters } from "@/lib/hooks/use-formatters";
@@ -62,6 +66,9 @@ type ClientDetailsProps = {
     cars: DocumentCarOption[];
     profiles: Profile[];
   };
+  documentTemplates: DocumentTemplate[];
+  generatedDocuments: GeneratedDocument[];
+  deals: DealWithRelations[];
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -84,6 +91,9 @@ export function ClientDetails({
   activityItems,
   currentUserId,
   documentFormOptions,
+  documentTemplates,
+  generatedDocuments,
+  deals,
 }: ClientDetailsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [createDocumentOpen, setCreateDocumentOpen] = useState(false);
@@ -194,6 +204,14 @@ export function ClientDetails({
         onCreateOrder={() => setCreateDocumentOpen(true)}
       />
 
+      <GeneratedDocumentsPanel
+        documents={generatedDocuments}
+        templates={documentTemplates}
+        clientId={client.id}
+      />
+
+      <DealsSection deals={deals} createHref={`/deals/new?client_id=${client.id}`} />
+
       <ClientVehiclesPanel
         clientId={client.id}
         cars={cars}
@@ -228,6 +246,34 @@ export function ClientDetails({
           />
           <InfoRow label={tFields("taxId")} value={client.tax_id ?? dash} />
           <InfoRow label={tFields("vatId")} value={client.vat_id ?? dash} />
+          {client.bank_account ? (
+            <InfoRow label={t("bankAccount")} value={client.bank_account} />
+          ) : null}
+          {client.client_type === "individual" ? (
+            <>
+              {(client.birth_date ||
+                client.personal_id_number ||
+                client.identity_document_number) && (
+                <div className="border-t border-zinc-800/80 pt-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    {t("privateInformation")}
+                  </p>
+                  {client.birth_date ? (
+                    <InfoRow label={t("birthDate")} value={formatDate(client.birth_date, dash)} />
+                  ) : null}
+                  {client.personal_id_number ? (
+                    <InfoRow label={t("personalIdNumber")} value={client.personal_id_number} />
+                  ) : null}
+                  {client.identity_document_number ? (
+                    <InfoRow
+                      label={t("identityDocumentNumber")}
+                      value={client.identity_document_number}
+                    />
+                  ) : null}
+                </div>
+              )}
+            </>
+          ) : null}
           {client.notes ? (
             <div className={cn("border-t border-zinc-800/80 pt-3")}>
               <p className="text-zinc-500">{tFields("notes")}</p>

@@ -88,6 +88,10 @@ export function normalizeClientPayload(input: ClientFormInput) {
     preferred_language: input.preferred_language ?? null,
     tax_id: normalizeOptionalString(input.tax_id),
     vat_id: normalizeOptionalString(input.vat_id),
+    birth_date: normalizeOptionalString(input.birth_date),
+    personal_id_number: normalizeOptionalString(input.personal_id_number),
+    identity_document_number: normalizeOptionalString(input.identity_document_number),
+    bank_account: normalizeOptionalString(input.bank_account),
     notes: normalizeOptionalString(input.notes),
     is_active: input.is_active ?? true,
   };

@@ -10,6 +10,9 @@ import {
   getProfileById,
 } from "@/lib/queries/cars";
 import { getDocumentTasksByCarId } from "@/lib/queries/documents";
+import { getDocumentTemplates } from "@/lib/queries/document-templates";
+import { getGeneratedDocuments } from "@/lib/queries/generated-documents";
+import { getDealsByVehicleId } from "@/lib/queries/deals";
 
 type CarDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -35,11 +38,15 @@ export async function generateMetadata({
 }
 
 async function loadCarDetail(carId: number) {
-  const [car, expenses, clients, documentTasks] = await Promise.all([
+  const [car, expenses, clients, documentTasks, documentTemplates, generatedDocuments, deals] =
+    await Promise.all([
     getCarById(carId),
     getCarExpenses(carId),
     getClientOptions(),
     getDocumentTasksByCarId(carId),
+    getDocumentTemplates(),
+    getGeneratedDocuments({ vehicleId: carId }),
+    getDealsByVehicleId(carId),
   ]);
 
   const [client, owner, manager] = await Promise.all([
@@ -53,6 +60,9 @@ async function loadCarDetail(carId: number) {
     expenses,
     clients,
     documentTasks,
+    documentTemplates,
+    generatedDocuments,
+    deals,
     clientName: client?.full_name ?? null,
     ownerName: owner?.full_name ?? null,
     managerName: manager?.full_name ?? null,
@@ -81,6 +91,9 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
       ownerName={data.ownerName}
       managerName={data.managerName}
       documentTasks={data.documentTasks}
+      documentTemplates={data.documentTemplates}
+      generatedDocuments={data.generatedDocuments}
+      deals={data.deals}
     />
   );
 }

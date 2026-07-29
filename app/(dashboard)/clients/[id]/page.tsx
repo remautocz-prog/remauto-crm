@@ -16,6 +16,9 @@ import {
 } from "@/lib/queries/clients";
 import { getClientOptions, getProfileOptions } from "@/lib/queries/cars";
 import { getClientDocumentSummary } from "@/lib/queries/documents";
+import { getDocumentTemplates } from "@/lib/queries/document-templates";
+import { getGeneratedDocuments } from "@/lib/queries/generated-documents";
+import { getDealsByClientId } from "@/lib/queries/deals";
 import { getCurrentUser } from "@/lib/queries/dashboard";
 import { createClient } from "@/lib/supabase/server";
 import { translateDocumentStatus } from "@/lib/i18n/documents";
@@ -72,6 +75,9 @@ async function loadClientDetail(clientId: number) {
     documentCars,
     profiles,
     user,
+    documentTemplates,
+    generatedDocuments,
+    clientDeals,
   ] = await Promise.all([
     getClientById(clientId),
     getClientRelatedCars(clientId),
@@ -83,6 +89,9 @@ async function loadClientDetail(clientId: number) {
     getCarOptionsForDocuments(),
     getProfileOptions(),
     getCurrentUser(),
+    getDocumentTemplates(),
+    getGeneratedDocuments({ clientId }),
+    getDealsByClientId(clientId),
   ]);
 
   if (!client) return null;
@@ -118,6 +127,9 @@ async function loadClientDetail(clientId: number) {
       profiles,
     },
     currentUserId: user?.id ?? null,
+    documentTemplates,
+    generatedDocuments,
+    deals: clientDeals,
   };
 }
 
@@ -188,6 +200,9 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
       activityItems={activityItems}
       currentUserId={data.currentUserId}
       documentFormOptions={data.documentFormOptions}
+      documentTemplates={data.documentTemplates}
+      generatedDocuments={data.generatedDocuments}
+      deals={data.deals}
     />
   );
 }

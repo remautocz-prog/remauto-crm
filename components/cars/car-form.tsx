@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import type { Car, CarFormInput, ClientOption, Profile } from "@/lib/types/cars";
 import { CAR_STATUS_VALUES } from "@/lib/constants/cars";
+import { FUEL_TYPE_VALUES } from "@/lib/constants/fuel-type";
 import {
   BUSINESS_MODEL_VALUES,
   COMMISSION_TYPE_VALUES,
@@ -72,6 +73,13 @@ function toFormState(car?: Car, initialClientId?: number | null): CarFormInput {
     client_id: car?.client_id ?? initialClientId ?? null,
     manager_id: car?.manager_id ?? null,
     notes: car?.notes ?? "",
+    first_registration_date: car?.first_registration_date ?? "",
+    fuel_type: car?.fuel_type ?? "",
+    engine_capacity: car?.engine_capacity ?? "",
+    power_kw: car?.power_kw ?? null,
+    technical_certificate_number: car?.technical_certificate_number ?? "",
+    key_count: car?.key_count ?? null,
+    mileage: car?.mileage ?? null,
   };
 }
 
@@ -115,6 +123,7 @@ export function CarForm({ car, clients, profiles, mode, initialClientId }: CarFo
   const tBusinessModel = useTranslations("businessModel");
   const tCommissionType = useTranslations("commissionType");
   const tValidation = useTranslations("validation");
+  const tFuel = useTranslations("fuelType");
 
   const businessModel = form.business_model ?? DEFAULT_BUSINESS_MODEL;
 
@@ -243,7 +252,7 @@ export function CarForm({ car, clients, profiles, mode, initialClientId }: CarFo
             <Input
               id="vin"
               value={form.vin ?? ""}
-              onChange={(e) => updateField("vin", e.target.value)}
+              onChange={(e) => updateField("vin", e.target.value.toUpperCase())}
               className={fieldClass("vin")}
               aria-invalid={Boolean(fieldErrors.vin)}
             />
@@ -324,6 +333,97 @@ export function CarForm({ car, clients, profiles, mode, initialClientId }: CarFo
               </SelectContent>
             </Select>
             <FieldError message={fieldErrors.status} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-zinc-800 bg-zinc-900/60">
+        <CardHeader>
+          <CardTitle className="text-base text-white">{t("technicalDetails")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="first_registration_date">{t("firstRegistrationDate")}</Label>
+            <Input
+              id="first_registration_date"
+              type="date"
+              value={form.first_registration_date ?? ""}
+              onChange={(e) => updateField("first_registration_date", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t("fuelType")}</Label>
+            <Select
+              value={form.fuel_type || "none"}
+              onValueChange={(value) =>
+                updateField("fuel_type", value === "none" ? "" : value)
+              }
+            >
+              <SelectTrigger id="fuel_type" data-field="fuel_type">
+                <SelectValue placeholder={tFields("notSelected")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{tFields("notSelected")}</SelectItem>
+                {FUEL_TYPE_VALUES.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {tFuel(value)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="engine_capacity">{t("engineCapacity")}</Label>
+            <Input
+              id="engine_capacity"
+              value={form.engine_capacity ?? ""}
+              onChange={(e) => updateField("engine_capacity", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="power_kw">{t("powerKw")}</Label>
+            <Input
+              id="power_kw"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.power_kw ?? ""}
+              onChange={(e) => updateField("power_kw", toNumberOrNull(e.target.value))}
+              className={fieldClass("power_kw")}
+            />
+            <FieldError message={fieldErrors.power_kw} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="technical_certificate_number">{t("technicalCertificateNumber")}</Label>
+            <Input
+              id="technical_certificate_number"
+              value={form.technical_certificate_number ?? ""}
+              onChange={(e) => updateField("technical_certificate_number", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="key_count">{t("keyCount")}</Label>
+            <Input
+              id="key_count"
+              type="number"
+              min={0}
+              value={form.key_count ?? ""}
+              onChange={(e) => updateField("key_count", toNumberOrNull(e.target.value))}
+              className={fieldClass("key_count")}
+            />
+            <FieldError message={fieldErrors.key_count} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="mileage">{t("mileage")}</Label>
+            <Input
+              id="mileage"
+              type="number"
+              min={0}
+              value={form.mileage ?? ""}
+              onChange={(e) => updateField("mileage", toNumberOrNull(e.target.value))}
+              className={fieldClass("mileage")}
+            />
+            <FieldError message={fieldErrors.mileage} />
           </div>
         </CardContent>
       </Card>

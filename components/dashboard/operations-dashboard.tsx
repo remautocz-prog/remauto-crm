@@ -4,6 +4,7 @@ import type { Profile } from "@/lib/types/cars";
 import type { OperationsDashboardData } from "@/lib/types/dashboard";
 import { DashboardAttentionMetrics } from "@/components/dashboard/dashboard-attention-metrics";
 import { DashboardBusinessOverviewSection } from "@/components/dashboard/dashboard-business-overview";
+import { DashboardDealsSection } from "@/components/dashboard/dashboard-deals-section";
 import { DashboardEmployeeWorkloadSection } from "@/components/dashboard/dashboard-employee-workload";
 import { DashboardFinancialOverviewSection } from "@/components/dashboard/dashboard-financial-overview";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -32,6 +33,8 @@ export function OperationsDashboard({
         metrics={data.attention}
         error={data.errors.documents}
       />
+
+      <DashboardDealsSection metrics={data.deals} error={data.errors.deals} />
 
       <DashboardTodaysWork
         tasks={data.todaysWork}

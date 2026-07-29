@@ -1,6 +1,7 @@
 import {
   Car,
   FileText,
+  Handshake,
   Sparkles,
   Users,
   Wallet,
@@ -15,6 +16,7 @@ export type NavItemKey =
   | "cars"
   | "clients"
   | "documents"
+  | "deals"
   | "detailing"
   | "finance"
   | "reports"
@@ -31,6 +33,7 @@ export const navItems: NavItem[] = [
   { key: "cars", href: "/cars", icon: Car },
   { key: "clients", href: "/clients", icon: Users },
   { key: "documents", href: "/documents", icon: FileText },
+  { key: "deals", href: "/deals", icon: Handshake },
   { key: "detailing", href: "/detailing", icon: Sparkles },
   { key: "finance", href: "/finance", icon: Wallet },
   { key: "reports", href: "/reports", icon: BarChart3 },

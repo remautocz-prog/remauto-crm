@@ -59,6 +59,10 @@ function toFormState(client?: Client): ClientFormInput {
     preferred_language: client?.preferred_language ?? null,
     tax_id: client?.tax_id ?? "",
     vat_id: client?.vat_id ?? "",
+    birth_date: client?.birth_date ?? "",
+    personal_id_number: client?.personal_id_number ?? "",
+    identity_document_number: client?.identity_document_number ?? "",
+    bank_account: client?.bank_account ?? "",
     notes: client?.notes ?? "",
     is_active: client?.is_active ?? true,
   };
@@ -341,6 +345,51 @@ export function ClientFormDialog({
                 onChange={(e) => updateField("vat_id", e.target.value)}
               />
             </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="client_bank_account">{t("bankAccount")}</Label>
+              <Input
+                id="client_bank_account"
+                value={form.bank_account ?? ""}
+                onChange={(e) => updateField("bank_account", e.target.value)}
+              />
+            </div>
+
+            {form.client_type === "individual" ? (
+              <>
+                <div className="md:col-span-2 mt-2 border-t border-zinc-800 pt-4">
+                  <p className="text-sm font-medium text-zinc-300">{t("privateInformation")}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="client_birth_date">{t("birthDate")}</Label>
+                  <Input
+                    id="client_birth_date"
+                    type="date"
+                    value={form.birth_date ?? ""}
+                    onChange={(e) => updateField("birth_date", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="client_personal_id">{t("personalIdNumber")}</Label>
+                  <Input
+                    id="client_personal_id"
+                    value={form.personal_id_number ?? ""}
+                    onChange={(e) => updateField("personal_id_number", e.target.value)}
+                  />
+                  <p className="text-xs text-zinc-500">{t("personalIdHelp")}</p>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="client_identity_document">{t("identityDocumentNumber")}</Label>
+                  <Input
+                    id="client_identity_document"
+                    value={form.identity_document_number ?? ""}
+                    onChange={(e) => updateField("identity_document_number", e.target.value)}
+                  />
+                  <p className="text-xs text-zinc-500">{t("identityDocumentHelp")}</p>
+                </div>
+              </>
+            ) : null}
+
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="client_notes">{tFields("notes")}</Label>
               <Textarea

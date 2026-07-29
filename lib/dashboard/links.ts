@@ -31,6 +31,25 @@ export function getDocumentsFilterHref(filter: {
   return query ? `/documents?${query}` : "/documents";
 }
 
+export function getDealsFilterHref(filter: {
+  active?: boolean;
+  unsignedPrepared?: boolean;
+  awaitingPayment?: boolean;
+  overdue?: boolean;
+  handoversToday?: boolean;
+  completedMonth?: boolean;
+}) {
+  const params = new URLSearchParams();
+  if (filter.active) params.set("filter", "active");
+  if (filter.unsignedPrepared) params.set("filter", "unsigned_prepared");
+  if (filter.awaitingPayment) params.set("filter", "awaiting_payment");
+  if (filter.overdue) params.set("filter", "overdue");
+  if (filter.handoversToday) params.set("filter", "handovers_today");
+  if (filter.completedMonth) params.set("filter", "completed_month");
+  const query = params.toString();
+  return query ? `/deals?${query}` : "/deals";
+}
+
 export const DASHBOARD_QUICK_ACTION_LINKS = {
   newCar: "/cars/new",
   newClient: "/clients",

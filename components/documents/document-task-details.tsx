@@ -15,6 +15,7 @@ import {
   Printer,
 } from "lucide-react";
 import type { ClientOption, Profile } from "@/lib/types/cars";
+import type { DocumentTemplate, GeneratedDocument } from "@/lib/types/document-templates";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 import { getClientDisplayName } from "@/lib/clients/validation";
 import {
@@ -29,7 +30,7 @@ import {
   type DocumentCarOption,
 } from "@/lib/documents/vehicle";
 import { archiveDocumentTaskAction, restoreDocumentTaskAction } from "@/lib/actions/documents";
-import { AttachmentsPlaceholder } from "@/components/documents/attachments-placeholder";
+import { GeneratedDocumentsPanel } from "@/components/document-generator/generated-documents-panel";
 import { DocumentChecklist } from "@/components/documents/document-checklist";
 import { DocumentTaskFinancePanel } from "@/components/documents/document-task-finance-panel";
 import { DocumentTaskServicesTable } from "@/components/documents/document-task-services-table";
@@ -52,6 +53,8 @@ type DocumentTaskDetailsProps = {
   clients: ClientOption[];
   cars: DocumentCarOption[];
   profiles: Profile[];
+  documentTemplates: DocumentTemplate[];
+  generatedDocuments: GeneratedDocument[];
 };
 
 function InfoRow({
@@ -74,6 +77,8 @@ export function DocumentTaskDetails({
   clients,
   cars,
   profiles,
+  documentTemplates,
+  generatedDocuments,
 }: DocumentTaskDetailsProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -341,7 +346,13 @@ export function DocumentTaskDetails({
       </Card>
 
       <div className="print:hidden">
-        <AttachmentsPlaceholder />
+        <GeneratedDocumentsPanel
+          documents={generatedDocuments}
+          templates={documentTemplates}
+          clientId={task.client_id}
+          vehicleId={task.car_id}
+          documentTaskId={task.id}
+        />
       </div>
 
       <p className="text-xs text-zinc-500 print:hidden">{t("paymentHistoryNote")}</p>

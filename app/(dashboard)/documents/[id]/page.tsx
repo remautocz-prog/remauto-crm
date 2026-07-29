@@ -4,6 +4,8 @@ import { getTranslations } from "next-intl/server";
 import { DocumentTaskDetails } from "@/components/documents/document-task-details";
 import { getClientOptions, getProfileOptions } from "@/lib/queries/cars";
 import { getDocumentTaskById } from "@/lib/queries/documents";
+import { getDocumentTemplates } from "@/lib/queries/document-templates";
+import { getGeneratedDocuments } from "@/lib/queries/generated-documents";
 import { createClient } from "@/lib/supabase/server";
 
 type DocumentDetailPageProps = {
@@ -59,10 +61,12 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
   }
   if (!task) notFound();
 
-  const [clients, cars, profiles] = await Promise.all([
+  const [clients, cars, profiles, documentTemplates, generatedDocuments] = await Promise.all([
     getClientOptions(),
     getCarOptions(),
     getProfileOptions(),
+    getDocumentTemplates(),
+    getGeneratedDocuments({ documentTaskId: taskId }),
   ]);
 
   return (
@@ -71,6 +75,8 @@ export default async function DocumentDetailPage({ params }: DocumentDetailPageP
       clients={clients}
       cars={cars}
       profiles={profiles}
+      documentTemplates={documentTemplates}
+      generatedDocuments={generatedDocuments}
     />
   );
 }

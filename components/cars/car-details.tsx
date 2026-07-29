@@ -7,7 +7,11 @@ import { ArrowLeft, BadgeCheck, ExternalLink, Pencil } from "lucide-react";
 import type { Car, CarExpense, ClientOption } from "@/lib/types/cars";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 import { DocumentsSection } from "@/components/documents/documents-section";
+import { GeneratedDocumentsPanel } from "@/components/document-generator/generated-documents-panel";
 import { DEFAULT_BUSINESS_MODEL } from "@/lib/constants/business-model";
+import { DealsSection } from "@/components/deals/deals-section";
+import type { DealWithRelations } from "@/lib/types/deals";
+import type { DocumentTemplate, GeneratedDocument } from "@/lib/types/document-templates";
 import { formatGrossCommissionDisplay } from "@/lib/cars/business-rules";
 import { CarStatusBadge } from "@/components/cars/car-status-badge";
 import { BusinessModelBadge } from "@/components/cars/business-model-badge";
@@ -28,6 +32,9 @@ type CarDetailsProps = {
   ownerName?: string | null;
   managerName?: string | null;
   documentTasks?: DocumentTaskWithRelations[];
+  documentTemplates?: DocumentTemplate[];
+  generatedDocuments?: GeneratedDocument[];
+  deals?: DealWithRelations[];
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -47,6 +54,9 @@ export function CarDetails({
   ownerName,
   managerName,
   documentTasks = [],
+  documentTemplates = [],
+  generatedDocuments = [],
+  deals = [],
 }: CarDetailsProps) {
   const [soldOpen, setSoldOpen] = useState(false);
   const tDocuments = useTranslations("documents");
@@ -62,6 +72,7 @@ export function CarDetails({
   const tCommon = useTranslations("common");
   const tBusinessModel = useTranslations("businessModel");
   const tCommissionType = useTranslations("commissionType");
+  const tFuel = useTranslations("fuelType");
   const { formatCurrency, formatDate, formatDateTime } = useFormatters();
   const dash = tCommon("dash");
 
@@ -123,6 +134,31 @@ export function CarDetails({
               value={car.registration_number ?? dash}
             />
             <InfoRow label={tFields("color")} value={car.color ?? dash} />
+            <InfoRow
+              label={t("firstRegistrationDate")}
+              value={car.first_registration_date ? formatDate(car.first_registration_date, dash) : dash}
+            />
+            <InfoRow
+              label={t("fuelType")}
+              value={car.fuel_type ? tFuel(car.fuel_type as never) : dash}
+            />
+            <InfoRow label={t("engineCapacity")} value={car.engine_capacity ?? dash} />
+            <InfoRow
+              label={t("powerKw")}
+              value={car.power_kw != null ? String(car.power_kw) : dash}
+            />
+            <InfoRow
+              label={t("technicalCertificateNumber")}
+              value={car.technical_certificate_number ?? dash}
+            />
+            <InfoRow
+              label={t("keyCount")}
+              value={car.key_count != null ? String(car.key_count) : dash}
+            />
+            <InfoRow
+              label={t("mileage")}
+              value={car.mileage != null ? String(car.mileage) : dash}
+            />
 
             {model === "owned" ? (
               <>
@@ -279,6 +315,15 @@ export function CarDetails({
         emptyMessage={tDocuments("empty")}
         compact
       />
+
+      <GeneratedDocumentsPanel
+        documents={generatedDocuments}
+        templates={documentTemplates}
+        clientId={car.client_id}
+        vehicleId={car.id}
+      />
+
+      <DealsSection deals={deals} createHref={`/deals/new?vehicle_a_id=${car.id}`} />
 
       <MarkSoldDialog
         car={car}
