@@ -4,9 +4,10 @@ import type { Car } from "@/lib/types/cars";
 import type {
   Client,
   ClientRelatedCounts,
+  ClientDetailingOrderActivity,
   ClientsListParams,
 } from "@/lib/types/clients";
-import type { DetailingOrder, DocumentTask, FinanceTransaction } from "@/lib/types/database";
+import type { DocumentTask, FinanceTransaction } from "@/lib/types/database";
 
 function mapClient(row: Record<string, unknown>): Client {
   return {
@@ -81,10 +82,9 @@ export async function getClients(params: ClientsListParams = {}) {
   let clients = (data ?? []).map((row) => mapClient(row as Record<string, unknown>));
 
   if (params.sort === "last_activity") {
-    const [carsResult, docsResult, detailingResult] = await Promise.all([
+    const [carsResult, docsResult] = await Promise.all([
       supabase.from("cars").select("id, client_id, owner_client_id, updated_at, created_at"),
       supabase.from("document_tasks").select("id, client_id, created_at, updated_at"),
-      supabase.from("detailing_orders").select("id, client_id, created_at, updated_at"),
     ]);
 
     const cars = (carsResult.data ?? []) as Array<{
@@ -94,7 +94,6 @@ export async function getClients(params: ClientsListParams = {}) {
       created_at: string;
     }>;
     const docs = (docsResult.data ?? []) as DocumentTask[];
-    const detailing = (detailingResult.data ?? []) as DetailingOrder[];
 
     clients = clients
       .map((client) => {
@@ -102,7 +101,6 @@ export async function getClients(params: ClientsListParams = {}) {
           (car) => car.client_id === client.id || car.owner_client_id === client.id
         ) as Car[];
         const relatedDocs = docs.filter((task) => task.client_id === client.id);
-        const relatedDetailing = detailing.filter((order) => order.client_id === client.id);
 
         return {
           client,
@@ -110,7 +108,7 @@ export async function getClients(params: ClientsListParams = {}) {
             client,
             cars: relatedCars,
             documentTasks: relatedDocs,
-            detailingOrders: relatedDetailing,
+            detailingOrders: [],
           }),
         };
       })
@@ -190,16 +188,10 @@ export async function getClientDocumentTasks(clientId: number) {
   return (data ?? []) as DocumentTask[];
 }
 
-export async function getClientDetailingOrders(clientId: number) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("detailing_orders")
-    .select("*")
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []) as DetailingOrder[];
+export async function getClientDetailingOrders(_clientId: number) {
+  void _clientId;
+  // Detailing orders are standalone and not linked to CRM clients (no client_id column).
+  return [] as ClientDetailingOrderActivity[];
 }
 
 export async function getClientFinanceTransactions(carIds: number[]) {
@@ -219,7 +211,7 @@ export async function getClientFinanceTransactions(carIds: number[]) {
 export async function getClientRelatedCounts(clientId: number): Promise<ClientRelatedCounts> {
   const supabase = await createClient();
 
-  const [buyerCars, ownerCars, docs, detailing, carsForFinance] = await Promise.all([
+  const [buyerCars, ownerCars, docs, carsForFinance] = await Promise.all([
     supabase.from("cars").select("id", { count: "exact", head: true }).eq("client_id", clientId),
     supabase
       .from("cars")
@@ -227,10 +219,6 @@ export async function getClientRelatedCounts(clientId: number): Promise<ClientRe
       .eq("owner_client_id", clientId),
     supabase
       .from("document_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("client_id", clientId),
-    supabase
-      .from("detailing_orders")
       .select("id", { count: "exact", head: true })
       .eq("client_id", clientId),
     supabase
@@ -242,7 +230,6 @@ export async function getClientRelatedCounts(clientId: number): Promise<ClientRe
   if (buyerCars.error) throw buyerCars.error;
   if (ownerCars.error) throw ownerCars.error;
   if (docs.error) throw docs.error;
-  if (detailing.error) throw detailing.error;
   if (carsForFinance.error) throw carsForFinance.error;
 
   const carIds = (carsForFinance.data ?? []).map((row) => Number(row.id));
@@ -261,7 +248,7 @@ export async function getClientRelatedCounts(clientId: number): Promise<ClientRe
     carsAsBuyer: buyerCars.count ?? 0,
     carsAsOwner: ownerCars.count ?? 0,
     documentTasks: docs.count ?? 0,
-    detailingOrders: detailing.count ?? 0,
+    detailingOrders: 0,
     financeTransactions: financeCount,
   };
 }

@@ -1,8 +1,14 @@
 import { COMPLETED_DOCUMENT_TASK_STATUSES } from "@/lib/constants/documents";
 import { getDocumentFinanceSummary } from "@/lib/documents/helpers";
 import type { Car } from "@/lib/types/cars";
-import type { Client, ClientActivityItem, ClientNote } from "@/lib/types/clients";
-import type { DetailingOrder, DocumentTask, FinanceTransaction } from "@/lib/types/database";
+import type {
+  Client,
+  ClientActivityItem,
+  ClientDetailingOrderActivity,
+  ClientDetailingOrderSummary,
+  ClientNote,
+} from "@/lib/types/clients";
+import type { DocumentTask, FinanceTransaction } from "@/lib/types/database";
 import { getDocumentTaskTitle } from "@/lib/types/database";
 
 const COMPLETED_STATUSES = new Set([
@@ -18,7 +24,7 @@ export function buildClientActivityTimeline(input: {
   client: Client;
   cars: Car[];
   documentTasks: DocumentTask[];
-  detailingOrders: DetailingOrder[];
+  detailingOrders: ClientDetailingOrderActivity[];
   financeTransactions: FinanceTransaction[];
   notes?: ClientNote[];
   labels: {
@@ -193,7 +199,7 @@ export function getClientLastActivityAt(input: {
   client: Client;
   cars: Car[];
   documentTasks: DocumentTask[];
-  detailingOrders: DetailingOrder[];
+  detailingOrders: ClientDetailingOrderSummary[];
   notes?: ClientNote[];
 }): string {
   const timestamps = [

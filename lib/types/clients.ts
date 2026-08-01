@@ -91,6 +91,19 @@ export type ClientRelatedCounts = {
   financeTransactions: number;
 };
 
+/** Partial detailing order row used for client last-activity timestamps. */
+export type ClientDetailingOrderSummary = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Detailing order fields used when rendering client activity timeline entries. */
+export type ClientDetailingOrderActivity = ClientDetailingOrderSummary & {
+  status: string;
+  actual_completion_at: string | null;
+};
+
 export type ClientActivityItem = {
   id: string;
   kind:
