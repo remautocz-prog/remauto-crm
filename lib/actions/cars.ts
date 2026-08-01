@@ -10,6 +10,11 @@ import {
   type CarFieldErrors,
   type CarValidationMessageKey,
 } from "@/lib/cars/business-rules";
+import {
+  CAR_STATUS_VALUES,
+  type CarStatusValue,
+} from "@/lib/constants/cars";
+import { CAR_STATUS_SOLD } from "@/lib/constants/status";
 import { createClient } from "@/lib/supabase/server";
 import type { Car, CarExpenseInput, CarFormInput } from "@/lib/types/cars";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
@@ -171,6 +176,60 @@ export async function markCarSoldAction(
   revalidatePath(`/cars/${id}`);
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  return { success: true };
+}
+
+function revalidateCarPaths(id: number) {
+  revalidatePath("/cars");
+  revalidatePath(`/cars/${id}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+}
+
+export async function changeCarStatusAction(
+  id: number,
+  status: CarStatusValue
+): Promise<ActionResult> {
+  if (!CAR_STATUS_VALUES.includes(status)) {
+    return { success: false, error: "Invalid status" };
+  }
+
+  if (status === CAR_STATUS_SOLD) {
+    return {
+      success: false,
+      error: "Use markCarSoldAction to mark a vehicle as sold",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: car, error: loadError } = await supabase
+    .from("cars")
+    .select("status")
+    .eq("id", id)
+    .single();
+
+  if (loadError || !car) {
+    return {
+      success: false,
+      error: loadError?.message ?? "Car not found",
+    };
+  }
+
+  const typedCar = car as Pick<Car, "status">;
+  const update: Record<string, unknown> = { status };
+
+  if (typedCar.status === CAR_STATUS_SOLD) {
+    update.actual_sale_price = null;
+    update.sale_date = null;
+  }
+
+  const { error } = await supabase.from("cars").update(update).eq("id", id);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidateCarPaths(id);
   return { success: true };
 }
 

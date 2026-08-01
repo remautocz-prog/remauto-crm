@@ -181,6 +181,8 @@
     "noEmployeeWorkload": "Нет назначенных заказов",
     "activeOrdersShort": "Активные",
     "recentActivity": "Последние действия",
+    "recentVehicles": "Последние автомобили",
+    "noRecentVehicles": "Автомобилей пока нет",
     "today": "Сегодня",
     "thisWeek": "Эта неделя",
     "thisMonth": "Этот месяц",
@@ -289,7 +291,22 @@
     "powerKw": "Мощность, кВт",
     "technicalCertificateNumber": "Номер технического паспорта",
     "keyCount": "Количество ключей",
-    "mileage": "Пробег"
+    "mileage": "Пробег",
+    "addThirdPartyCommission": "Добавить комиссию третьему лицу",
+    "commissionRecipientNote": "Получатель комиссии / примечание",
+    "commissionRecipientNotePlaceholder": "Реферальная комиссия — Jan Novák",
+    "changeVehicleStatus": "Изменить статус автомобиля",
+    "confirmStatusChange": "Подтвердить изменение статуса",
+    "projectedProfit": "Планируемая прибыль",
+    "finalProfit": "Итоговая прибыль",
+    "status": {
+      "change": "Изменить статус автомобиля",
+      "updated": "Статус автомобиля обновлён",
+      "confirmRevertTitle": "Вернуть статус из «Продан»?",
+      "confirmRevertMessage": "Автомобиль вернётся в активный статус, фактическая цена и дата продажи будут очищены.",
+      "confirmRevertAction": "Подтвердить изменение",
+      "cancel": "Отмена"
+    }
   },
   "clients": {
     "title": "Клиенты",
@@ -1989,6 +2006,7 @@
     "repair": "Ремонт",
     "detailing": "Детейлинг",
     "documents": "Документы",
+    "third_party_commission": "Комиссия третьему лицу",
     "other": "Прочее"
   },
   "status": {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Loader2, Plus, Search } from "lucide-react";
-import type { Car } from "@/lib/types/cars";
+import type { Car, ClientOption } from "@/lib/types/cars";
 import {
   CAR_SORT_VALUES,
   CAR_STATUS_VALUES,
@@ -14,7 +14,7 @@ import {
 import { BUSINESS_MODEL_VALUES } from "@/lib/constants/business-model";
 import { getListRowDisplay } from "@/lib/cars/business-rules";
 import { BusinessModelBadge } from "@/components/cars/business-model-badge";
-import { CarStatusBadge } from "@/components/cars/car-status-badge";
+import { CarStatusControl } from "@/components/cars/car-status-control";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,8 @@ const SORT_LABEL_KEYS: Record<CarSortValue, "newest" | "purchaseDate" | "price" 
 type CarsListProps = {
   cars: Car[];
   clientNames: Record<number, string>;
+  clients: ClientOption[];
+  expenseTotals: Record<number, number>;
   initialQuery: string;
   initialStatus: string;
   initialBusinessModel: string;
@@ -85,6 +87,8 @@ function getTableHeaders(
 export function CarsList({
   cars,
   clientNames,
+  clients,
+  expenseTotals,
   initialQuery,
   initialStatus,
   initialBusinessModel,
@@ -96,6 +100,9 @@ export function CarsList({
   const [status, setStatus] = useState(initialStatus);
   const [businessModel, setBusinessModel] = useState(initialBusinessModel);
   const [sort, setSort] = useState(initialSort);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(
+    null
+  );
 
   const t = useTranslations("cars");
   const tActions = useTranslations("actions");
@@ -173,6 +180,18 @@ export function CarsList({
 
   return (
     <div className="space-y-6">
+      {toast ? (
+        <p
+          className={
+            toast.type === "success"
+              ? "rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-400"
+              : "rounded-md border border-red-600/30 bg-red-600/10 px-3 py-2 text-sm text-red-400"
+          }
+          role="status"
+        >
+          {toast.message}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">{t("title")}</h2>
@@ -326,9 +345,10 @@ export function CarsList({
               </thead>
               <tbody>
                 {cars.map((car) => {
+                  const totalExpenses = expenseTotals[car.id] ?? 0;
                   const display = getListRowDisplay(
                     car,
-                    0,
+                    totalExpenses,
                     car.client_id ? clientNames[car.client_id] : null
                   );
 
@@ -356,7 +376,12 @@ export function CarsList({
                         <BusinessModelBadge businessModel={car.business_model} />
                       </td>
                       <td className="px-4 py-3">
-                        <CarStatusBadge status={car.status} />
+                        <CarStatusControl
+                          car={car}
+                          clients={clients}
+                          compact
+                          onToast={setToast}
+                        />
                       </td>
                       <td className="px-4 py-3 text-zinc-300">
                         {renderPrimaryCell(car, display)}
@@ -388,9 +413,10 @@ export function CarsList({
 
           <div className="grid gap-4 lg:hidden">
             {cars.map((car) => {
+              const totalExpenses = expenseTotals[car.id] ?? 0;
               const display = getListRowDisplay(
                 car,
-                0,
+                totalExpenses,
                 car.client_id ? clientNames[car.client_id] : null
               );
 
@@ -410,7 +436,12 @@ export function CarsList({
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <BusinessModelBadge businessModel={car.business_model} />
-                        <CarStatusBadge status={car.status} />
+                        <CarStatusControl
+                          car={car}
+                          clients={clients}
+                          compact
+                          onToast={setToast}
+                        />
                       </div>
                     </div>
                   </CardHeader>

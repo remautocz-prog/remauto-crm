@@ -67,6 +67,27 @@ export async function getCarExpenses(carId: number) {
   return (data ?? []) as CarExpense[];
 }
 
+export async function getCarExpenseTotalsByCarIds(
+  carIds: number[]
+): Promise<Record<number, number>> {
+  if (carIds.length === 0) return {};
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("car_expenses")
+    .select("car_id, amount")
+    .in("car_id", carIds);
+
+  if (error) throw error;
+
+  const totals: Record<number, number> = {};
+  for (const row of data ?? []) {
+    const carId = Number(row.car_id);
+    totals[carId] = (totals[carId] ?? 0) + Number(row.amount ?? 0);
+  }
+  return totals;
+}
+
 export async function getClientOptions() {
   const supabase = await createClient();
   const { data, error } = await supabase

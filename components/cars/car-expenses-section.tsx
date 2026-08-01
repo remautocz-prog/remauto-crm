@@ -31,6 +31,7 @@ export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
+  const [commissionOpen, setCommissionOpen] = useState(false);
   const [editExpense, setEditExpense] = useState<CarExpense | null>(null);
   const [deleteExpense, setDeleteExpense] = useState<CarExpense | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,10 +73,16 @@ export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
             {tFields("total")}: {formatCurrency(totalExpenses)}
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          {tActions("add")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setCommissionOpen(true)}>
+            <Plus className="h-4 w-4" />
+            {t("addThirdPartyCommission")}
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            {tActions("add")}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
@@ -143,6 +150,15 @@ export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
         carId={car.id}
         open={createOpen}
         onOpenChange={setCreateOpen}
+      />
+
+      <ExpenseFormDialog
+        carId={car.id}
+        open={commissionOpen}
+        onOpenChange={setCommissionOpen}
+        defaultCategory="third_party_commission"
+        title={t("addThirdPartyCommission")}
+        descriptionPlaceholder={t("commissionRecipientNotePlaceholder")}
       />
 
       <ExpenseFormDialog

@@ -10,6 +10,7 @@ import { DashboardFinancialOverviewSection } from "@/components/dashboard/dashbo
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardPeriodSelector } from "@/components/dashboard/dashboard-period-selector";
 import { DashboardRecentActivitySection } from "@/components/dashboard/dashboard-recent-activity";
+import { DashboardRecentVehiclesSection } from "@/components/dashboard/dashboard-recent-vehicles";
 import { DashboardTodaysWork } from "@/components/dashboard/dashboard-todays-work";
 
 type OperationsDashboardProps = {
@@ -57,6 +58,12 @@ export function OperationsDashboard({
           clients: data.errors.clients,
           documents: data.errors.documents,
         }}
+      />
+
+      <DashboardRecentVehiclesSection
+        cars={data.recentCars}
+        clients={data.clientOptions}
+        error={data.errors.cars}
       />
 
       <DashboardEmployeeWorkloadSection

@@ -37,6 +37,7 @@ type MarkSoldDialogProps = {
   clients: ClientOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSold?: () => void;
 };
 
 function focusFirstFieldError(fieldErrors: CarFieldErrors) {
@@ -58,6 +59,7 @@ export function MarkSoldDialog({
   clients,
   open,
   onOpenChange,
+  onSold,
 }: MarkSoldDialogProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -142,6 +144,7 @@ export function MarkSoldDialog({
       }
 
       onOpenChange(false);
+      onSold?.();
       router.refresh();
     });
   }

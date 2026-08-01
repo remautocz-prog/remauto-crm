@@ -11,6 +11,7 @@ export const EXPENSE_CATEGORY_VALUES = [
   "repair",
   "detailing",
   "documents",
+  "third_party_commission",
   "other",
 ] as const;
 

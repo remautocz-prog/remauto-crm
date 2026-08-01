@@ -380,6 +380,8 @@ function emptyDashboardData(
     },
     employeeWorkload: [],
     recentActivity: [],
+    recentCars: [],
+    clientOptions: [],
     deals: {
       activeDeals: 0,
       unsignedPreparedDeals: 0,
@@ -544,6 +546,20 @@ export async function getOperationsDashboardData(
       .join("; ");
   }
 
+  const recentCars = [...cars]
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at ?? b.created_at).getTime() -
+        new Date(a.updated_at ?? a.created_at).getTime()
+    )
+    .slice(0, 8);
+
+  const clientOptions = clients.map((client) => ({
+    id: client.id,
+    full_name: client.full_name,
+    email: client.email,
+  }));
+
   return {
     period,
     attention,
@@ -552,6 +568,8 @@ export async function getOperationsDashboardData(
     business,
     employeeWorkload,
     recentActivity,
+    recentCars,
+    clientOptions,
     deals,
     errors,
   };

@@ -181,6 +181,8 @@
     "noEmployeeWorkload": "Zatím žádné přiřazené zakázky",
     "activeOrdersShort": "Aktivní",
     "recentActivity": "Poslední aktivita",
+    "recentVehicles": "Poslední vozidla",
+    "noRecentVehicles": "Zatím žádná vozidla",
     "today": "Dnes",
     "thisWeek": "Tento týden",
     "thisMonth": "Tento měsíc",
@@ -289,7 +291,22 @@
     "powerKw": "Výkon, kW",
     "technicalCertificateNumber": "Číslo technického průkazu",
     "keyCount": "Počet klíčů",
-    "mileage": "Stav tachometru"
+    "mileage": "Stav tachometru",
+    "addThirdPartyCommission": "Přidat provizi třetí straně",
+    "commissionRecipientNote": "Příjemce provize / poznámka",
+    "commissionRecipientNotePlaceholder": "Referral provize — Jan Novák",
+    "changeVehicleStatus": "Změnit stav vozidla",
+    "confirmStatusChange": "Potvrdit změnu stavu",
+    "projectedProfit": "Odhadovaný zisk",
+    "finalProfit": "Konečný zisk",
+    "status": {
+      "change": "Změnit stav vozidla",
+      "updated": "Stav vozidla aktualizován",
+      "confirmRevertTitle": "Vrátit stav z prodáno?",
+      "confirmRevertMessage": "Vozidlo se vrátí do aktivního stavu a záznam o prodejní ceně a datu bude vymazán.",
+      "confirmRevertAction": "Potvrdit změnu",
+      "cancel": "Zrušit"
+    }
   },
   "clients": {
     "title": "Klienti",
@@ -1989,6 +2006,7 @@
     "repair": "Oprava",
     "detailing": "Detailing",
     "documents": "Dokumenty",
+    "third_party_commission": "Provize třetí straně",
     "other": "Ostatní"
   },
   "status": {

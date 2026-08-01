@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { CarsList } from "@/components/cars/cars-list";
 import { LoadingScreen } from "@/components/shared/loading-screen";
-import { getCars, getClientOptions } from "@/lib/queries/cars";
+import { getCars, getClientOptions, getCarExpenseTotalsByCarIds } from "@/lib/queries/cars";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("nav");
@@ -34,11 +34,14 @@ async function CarsPageContent({
     getClientOptions(),
   ]);
   const clientNames = Object.fromEntries(clients.map((client) => [client.id, client.full_name]));
+  const expenseTotals = await getCarExpenseTotalsByCarIds(cars.map((car) => car.id));
 
   return (
     <CarsList
       cars={cars}
       clientNames={clientNames}
+      clients={clients}
+      expenseTotals={expenseTotals}
       initialQuery={q}
       initialStatus={status}
       initialBusinessModel={businessModel}

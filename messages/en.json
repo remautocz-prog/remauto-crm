@@ -181,6 +181,8 @@
     "noEmployeeWorkload": "No assigned orders yet",
     "activeOrdersShort": "Active",
     "recentActivity": "Recent activity",
+    "recentVehicles": "Recent vehicles",
+    "noRecentVehicles": "No vehicles yet",
     "today": "Today",
     "thisWeek": "This week",
     "thisMonth": "This month",
@@ -289,7 +291,22 @@
     "powerKw": "Power, kW",
     "technicalCertificateNumber": "Technical certificate number",
     "keyCount": "Number of keys",
-    "mileage": "Mileage"
+    "mileage": "Mileage",
+    "addThirdPartyCommission": "Add third-party commission",
+    "commissionRecipientNote": "Commission recipient / note",
+    "commissionRecipientNotePlaceholder": "Referral commission — Jan Novák",
+    "changeVehicleStatus": "Change vehicle status",
+    "confirmStatusChange": "Confirm status change",
+    "projectedProfit": "Projected profit",
+    "finalProfit": "Final profit",
+    "status": {
+      "change": "Change vehicle status",
+      "updated": "Vehicle status updated",
+      "confirmRevertTitle": "Revert sold status?",
+      "confirmRevertMessage": "This will move the vehicle back to an active status and clear the recorded sale price and date.",
+      "confirmRevertAction": "Confirm change",
+      "cancel": "Cancel"
+    }
   },
   "clients": {
     "title": "Clients",
@@ -1989,6 +2006,7 @@
     "repair": "Repair",
     "detailing": "Detailing",
     "documents": "Documents",
+    "third_party_commission": "Third-party commission",
     "other": "Other"
   },
   "status": {

@@ -34,11 +34,17 @@ type ExpenseFormDialogProps = {
   expense?: CarExpense;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultCategory?: string;
+  descriptionPlaceholder?: string;
+  title?: string;
 };
 
-function toExpenseForm(expense?: CarExpense): CarExpenseInput {
+function toExpenseForm(
+  expense?: CarExpense,
+  defaultCategory?: string
+): CarExpenseInput {
   return {
-    category: expense?.category ?? "other",
+    category: expense?.category ?? defaultCategory ?? "other",
     amount: expense ? Number(expense.amount) : 0,
     description: expense?.description ?? "",
     expense_date: expense?.expense_date ?? new Date().toISOString().slice(0, 10),
@@ -50,6 +56,9 @@ export function ExpenseFormDialog({
   expense,
   open,
   onOpenChange,
+  defaultCategory,
+  descriptionPlaceholder,
+  title,
 }: ExpenseFormDialogProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -62,7 +71,7 @@ export function ExpenseFormDialog({
   const tExpenseCategories = useTranslations("expenseCategories");
 
   function handleOpenChange(next: boolean) {
-    if (next) setForm(toExpenseForm(expense));
+    if (next) setForm(toExpenseForm(expense, defaultCategory));
     setError(null);
     onOpenChange(next);
   }
@@ -91,7 +100,7 @@ export function ExpenseFormDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {expense ? t("editExpense") : t("addExpense")}
+            {title ?? (expense ? t("editExpense") : t("addExpense"))}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -145,9 +154,14 @@ export function ExpenseFormDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">{tFields("description")}</Label>
+            <Label htmlFor="description">
+              {defaultCategory === "third_party_commission"
+                ? t("commissionRecipientNote")
+                : tFields("description")}
+            </Label>
             <Textarea
               id="description"
+              placeholder={descriptionPlaceholder}
               value={form.description ?? ""}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, description: e.target.value }))

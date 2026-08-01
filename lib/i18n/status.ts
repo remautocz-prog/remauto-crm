@@ -19,6 +19,7 @@ const EXPENSE_CATEGORY_KEYS = [
   "repair",
   "detailing",
   "documents",
+  "third_party_commission",
   "other",
 ] as const;
 

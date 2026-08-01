@@ -1,3 +1,4 @@
+import type { Car, ClientOption } from "@/lib/types/cars";
 import type { DashboardPeriod } from "@/lib/dashboard/period";
 import type { DealDashboardMetrics } from "@/lib/types/deals";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
@@ -97,6 +98,8 @@ export type OperationsDashboardData = {
   business: DashboardBusinessOverview;
   employeeWorkload: DashboardEmployeeWorkloadRow[];
   recentActivity: DashboardActivityItem[];
+  recentCars: Car[];
+  clientOptions: ClientOption[];
   deals: DealDashboardMetrics;
   errors: DashboardSectionErrors;
 };

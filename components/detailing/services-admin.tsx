@@ -29,7 +29,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -324,13 +323,13 @@ export function DetailingServicesAdmin({ services }: DetailingServicesAdminProps
               </label>
             </div>
           </div>
-          <DialogFooter>
+          <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setEditorOpen(false)}>{t("cancel")}</Button>
             <Button onClick={saveService} disabled={isPending || !form.name_cs.trim() || !form.name_ru.trim()}>
               {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {t("saveService")}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

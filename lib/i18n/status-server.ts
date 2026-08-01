@@ -14,6 +14,7 @@ export async function getExpenseCategoryLabel(category: string) {
     "repair",
     "detailing",
     "documents",
+    "third_party_commission",
     "other",
   ] as const;
 
