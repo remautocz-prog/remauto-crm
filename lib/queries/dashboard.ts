@@ -7,6 +7,10 @@ import {
   FINANCE_TYPE_INCOME,
   OPEN_DOCUMENT_TASK_STATUSES,
 } from "@/lib/constants/status";
+import {
+  logDetailingQueryError,
+  isDetailingDatabaseUnavailableError,
+} from "@/lib/detailing/query-utils";
 import type { DashboardStats } from "@/lib/types/database";
 
 function getMonthBounds() {
@@ -48,7 +52,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     supabase
       .from("detailing_orders")
       .select("id", { count: "exact", head: true })
-      .in("status", [...ACTIVE_DETAILING_STATUSES]),
+      .in("status", [...ACTIVE_DETAILING_STATUSES])
+      .is("archived_at", null),
     supabase
       .from("finance_transactions")
       .select("amount")
@@ -67,7 +72,17 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   if (carsInStockResult.error) throw carsInStockResult.error;
   if (carsSoldResult.error) throw carsSoldResult.error;
   if (documentTasksResult.error) throw documentTasksResult.error;
-  if (detailingResult.error) throw detailingResult.error;
+
+  let activeDetailingOrders = 0;
+  if (detailingResult.error) {
+    logDetailingQueryError("getDashboardStats.detailing", detailingResult.error);
+    if (!isDetailingDatabaseUnavailableError(detailingResult.error)) {
+      console.warn("[dashboard] detailing count unavailable, defaulting to 0");
+    }
+  } else {
+    activeDetailingOrders = detailingResult.count ?? 0;
+  }
+
   if (incomeResult.error) throw incomeResult.error;
   if (expenseResult.error) throw expenseResult.error;
 
@@ -81,7 +96,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     carsInStock: carsInStockResult.count ?? 0,
     carsSold: carsSoldResult.count ?? 0,
     openDocumentTasks: documentTasksResult.count ?? 0,
-    activeDetailingOrders: detailingResult.count ?? 0,
+    activeDetailingOrders,
     monthlyProfit: totalIncome - totalExpense,
   };
 }

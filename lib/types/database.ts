@@ -1,19 +1,6 @@
 export type Client = import("@/lib/types/clients").Client;
 export type DocumentTask = import("@/lib/types/documents").DocumentTask;
-
-export type DetailingOrder = {
-  id: number;
-  car_id: number | null;
-  client_id: number | null;
-  service_type?: string | null;
-  status: string;
-  price: number;
-  scheduled_at?: string | null;
-  manager_id?: string | null;
-  notes?: string | null;
-  created_at: string;
-  updated_at: string;
-};
+export type DetailingOrder = import("@/lib/types/detailing").DetailingOrderWithServices;
 
 export type FinanceTransaction = {
   id: number;

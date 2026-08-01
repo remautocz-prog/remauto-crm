@@ -1,10 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import type {
-  Client,
-  DetailingOrder,
-  DocumentTask,
-  FinanceTransaction,
-} from "@/lib/types/database";
+import type { Client, DocumentTask, FinanceTransaction } from "@/lib/types/database";
+
+export { getDetailingOrders } from "@/lib/queries/detailing";
 
 export async function getDocumentTasks() {
   const supabase = await createClient();
@@ -15,17 +12,6 @@ export async function getDocumentTasks() {
 
   if (error) throw error;
   return (data ?? []) as DocumentTask[];
-}
-
-export async function getDetailingOrders() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("detailing_orders")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []) as DetailingOrder[];
 }
 
 export async function getClients() {
