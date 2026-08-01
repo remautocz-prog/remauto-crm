@@ -173,8 +173,8 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
         tActivity("documentStatusChanged", { title, status }),
       documentPaymentMarked: (title, amount) =>
         tActivity("documentPaymentMarked", { title, amount }),
-      detailingCreated: (id) => tActivity("detailingCreated", { id }),
-      detailingCompleted: (id) => tActivity("detailingCompleted", { id }),
+      detailingCreated: (id: string) => tActivity("detailingCreated", { id }),
+      detailingCompleted: (id: string) => tActivity("detailingCompleted", { id }),
       paymentRegistered: (amount) => tActivity("paymentRegistered", { amount }),
       noteAdded: tClients("noteAdded"),
       documentFallback: (id) => tDocuments("taskFallback", { id }),

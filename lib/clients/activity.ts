@@ -32,8 +32,8 @@ export function buildClientActivityTimeline(input: {
     documentCompleted: (title: string) => string;
     documentStatusChanged: (title: string, status: string) => string;
     documentPaymentMarked: (title: string, amount: string) => string;
-    detailingCreated: (id: number) => string;
-    detailingCompleted: (id: number) => string;
+    detailingCreated: (id: string) => string;
+    detailingCompleted: (id: string) => string;
     paymentRegistered: (amount: string) => string;
     noteAdded: string;
     documentFallback: (id: number) => string;
@@ -147,16 +147,16 @@ export function buildClientActivityTimeline(input: {
       kind: "detailing_created",
       title: input.labels.detailingCreated(order.id),
       occurredAt: order.created_at,
-      href: "/detailing",
+      href: `/detailing/orders/${order.id}`,
     });
 
-    if (COMPLETED_STATUSES.has(order.status)) {
+    if (order.status === "delivered") {
       items.push({
         id: `detailing-completed-${order.id}`,
         kind: "detailing_completed",
         title: input.labels.detailingCompleted(order.id),
-        occurredAt: order.updated_at,
-        href: "/detailing",
+        occurredAt: order.actual_completion_at ?? order.updated_at,
+        href: `/detailing/orders/${order.id}`,
       });
     }
   }
