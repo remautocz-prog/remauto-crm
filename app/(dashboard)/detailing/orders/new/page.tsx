@@ -7,15 +7,29 @@ import { DetailingDatabaseNotReady } from "@/components/detailing/database-not-r
 import { DetailingQueryWarnings } from "@/components/detailing/detailing-query-warnings";
 import { loadNewDetailingOrderPageData } from "@/lib/detailing/new-order-page-data";
 import { runDetailingPage } from "@/lib/detailing/page-loader";
+import { loadDetailingOrderPrefill } from "@/lib/cars/detailing-prefill";
 import { Button } from "@/components/ui/button";
+
+type PageProps = {
+  searchParams: Promise<{ car_id?: string }>;
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("detailing");
   return { title: t("newOrder") };
 }
 
-export default async function NewDetailingOrderPage() {
+export default async function NewDetailingOrderPage({
+  searchParams,
+}: PageProps) {
   const t = await getTranslations("detailing");
+  const { car_id: carIdParam } = await searchParams;
+  const carId = carIdParam ? Number(carIdParam) : NaN;
+  const prefill =
+    Number.isFinite(carId) && carId > 0
+      ? await loadDetailingOrderPrefill(carId)
+      : null;
+
   const result = await runDetailingPage(loadNewDetailingOrderPageData);
 
   if (result.blocked) {
@@ -48,7 +62,12 @@ export default async function NewDetailingOrderPage() {
         </div>
       </div>
 
-      <DetailingNewOrderForm services={services} employees={employees} warnings={warnings} />
+      <DetailingNewOrderForm
+        services={services}
+        employees={employees}
+        warnings={warnings}
+        prefill={prefill}
+      />
     </div>
   );
 }

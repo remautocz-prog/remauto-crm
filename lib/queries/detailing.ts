@@ -70,6 +70,7 @@ export function mapDetailingOrder(row: Record<string, unknown>): DetailingOrder 
   return {
     id: String(row.id),
     order_number: String(row.order_number),
+    car_id: row.car_id != null ? Number(row.car_id) : null,
     customer_first_name: (row.customer_first_name as string | null) ?? null,
     customer_last_name: (row.customer_last_name as string | null) ?? null,
     customer_phone: (row.customer_phone as string | null) ?? null,
@@ -229,6 +230,20 @@ export async function getDetailingOrderById(id: string) {
   return order ?? null;
 }
 
+export async function getDetailingOrdersByCarId(carId: number) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("detailing_orders")
+    .select(DETAILING_ORDER_SELECT)
+    .eq("car_id", carId)
+    .is("archived_at", null)
+    .order("appointment_date", { ascending: false })
+    .order("appointment_time", { ascending: false });
+
+  if (error) handleDetailingQueryError("getDetailingOrdersByCarId", error);
+  return mapOrderRowsWithServices((data ?? []) as Record<string, unknown>[]);
+}
+
 export async function getDetailingEmployees(includeInactive = false) {
   const supabase = await createClient();
   let query = supabase
@@ -327,7 +342,7 @@ export async function getDetailingDashboardStats(): Promise<DetailingDashboardSt
   const today = todayIso();
   const month = monthBounds();
 
-  const [todayOrders, inProgress, ready, monthDelivered, monthExpenses] = await Promise.all([
+  const [todayOrders, inProgress, ready, monthDeliveredOrders, monthExpenses] = await Promise.all([
     supabase
       .from("detailing_orders")
       .select("id, final_price, status")
@@ -345,7 +360,7 @@ export async function getDetailingDashboardStats(): Promise<DetailingDashboardSt
       .is("archived_at", null),
     supabase
       .from("detailing_orders")
-      .select("final_price, employee_commission_amount, actual_completion_at, updated_at")
+      .select(DETAILING_ORDER_SELECT)
       .eq("status", "delivered")
       .gte("actual_completion_at", `${month.from}T00:00:00.000Z`)
       .lte("actual_completion_at", `${month.to}T23:59:59.999Z`)
@@ -366,15 +381,17 @@ export async function getDetailingDashboardStats(): Promise<DetailingDashboardSt
   if (ready.error) {
     handleDetailingQueryError("getDetailingDashboardStats.ready", ready.error);
   }
-  if (monthDelivered.error) {
-    handleDetailingQueryError("getDetailingDashboardStats.monthDelivered", monthDelivered.error);
+  if (monthDeliveredOrders.error) {
+    handleDetailingQueryError("getDetailingDashboardStats.monthDelivered", monthDeliveredOrders.error);
   }
   if (monthExpenses.error) {
     handleDetailingQueryError("getDetailingDashboardStats.monthExpenses", monthExpenses.error);
   }
 
   const todayRows = todayOrders.data ?? [];
-  const deliveredRows = monthDelivered.data ?? [];
+  const deliveredOrders = await mapOrderRowsWithServices(
+    (monthDeliveredOrders.data ?? []) as Record<string, unknown>[]
+  );
   const expenseRows = monthExpenses.data ?? [];
 
   const revenueToday = roundMoney(
@@ -383,14 +400,9 @@ export async function getDetailingDashboardStats(): Promise<DetailingDashboardSt
       .reduce((sum, row) => sum + Number(row.final_price ?? 0), 0)
   );
   const monthRevenue = roundMoney(
-    deliveredRows.reduce((sum, row) => sum + Number(row.final_price ?? 0), 0)
+    deliveredOrders.reduce((sum, order) => sum + order.final_price, 0)
   );
-  const monthCommissions = roundMoney(
-    deliveredRows.reduce(
-      (sum, row) => sum + Number(row.employee_commission_amount ?? 0),
-      0
-    )
-  );
+  const monthCommissions = sumDeliveredOrderCommissions(deliveredOrders);
   const monthExpenseTotal = roundMoney(
     expenseRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0)
   );
@@ -400,7 +412,7 @@ export async function getDetailingDashboardStats(): Promise<DetailingDashboardSt
     carsInProgress: inProgress.count ?? 0,
     carsReady: ready.count ?? 0,
     revenueToday,
-    monthDeliveredOrders: deliveredRows.length,
+    monthDeliveredOrders: deliveredOrders.length,
     monthRevenue,
     monthCommissions,
     monthExpenses: monthExpenseTotal,

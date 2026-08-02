@@ -6,6 +6,7 @@ import { DetailingOrderDetailView } from "@/components/detailing/order-detail-vi
 import { DetailingDatabaseNotReady } from "@/components/detailing/database-not-ready";
 import { DetailingQueryWarnings } from "@/components/detailing/detailing-query-warnings";
 import { runDetailingPageSafe } from "@/lib/detailing/page-loader";
+import { getCarExpenseByDetailingOrderId } from "@/lib/queries/cars";
 import {
   getDetailingEmployees,
   getDetailingOrderById,
@@ -49,13 +50,27 @@ export default async function DetailingOrderDetailPage({ params }: PageProps) {
 
   if (!order) notFound();
 
+  let linkedCarExpense = null;
+  if (order.car_id) {
+    try {
+      linkedCarExpense = await getCarExpenseByDetailingOrderId(order.id);
+    } catch {
+      linkedCarExpense = null;
+    }
+  }
+
   return (
     <div className="space-y-4">
       <DetailingQueryWarnings warnings={result.warnings} />
       <Button asChild variant="outline" size="sm">
         <Link href="/detailing/orders">{t("backToOrders")}</Link>
       </Button>
-      <DetailingOrderDetailView order={order} services={services} employees={employees} />
+      <DetailingOrderDetailView
+        order={order}
+        services={services}
+        employees={employees}
+        linkedCarExpense={linkedCarExpense}
+      />
     </div>
   );
 }

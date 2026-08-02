@@ -34,6 +34,7 @@ import {
 } from "@/lib/detailing/form-utils";
 import type {
   DetailingEmployeeWithProfile,
+  DetailingOrderPrefill,
   DetailingService,
 } from "@/lib/types/detailing";
 import type { DetailingQueryWarning } from "@/lib/detailing/query-utils";
@@ -60,6 +61,7 @@ type DetailingNewOrderFormProps = {
   services: DetailingService[];
   employees: DetailingEmployeeWithProfile[];
   warnings?: DetailingQueryWarning[];
+  prefill?: DetailingOrderPrefill | null;
 };
 
 const VEHICLE_SIZES: DetailingVehicleSize[] = ["standard", "suv", "xxl"];
@@ -76,6 +78,7 @@ export function DetailingNewOrderForm({
   services,
   employees,
   warnings = [],
+  prefill = null,
 }: DetailingNewOrderFormProps) {
   const router = useRouter();
   const t = useTranslations("detailing");
@@ -84,12 +87,22 @@ export function DetailingNewOrderForm({
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  const [isInternalVehicle, setIsInternalVehicle] = useState(false);
-  const [customerFirstName, setCustomerFirstName] = useState("");
-  const [customerLastName, setCustomerLastName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [vehicleMakeModel, setVehicleMakeModel] = useState("");
-  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [isInternalVehicle, setIsInternalVehicle] = useState(
+    prefill?.isInternalVehicle ?? false
+  );
+  const [customerFirstName, setCustomerFirstName] = useState(
+    prefill?.customerFirstName ?? ""
+  );
+  const [customerLastName, setCustomerLastName] = useState(
+    prefill?.customerLastName ?? ""
+  );
+  const [customerPhone, setCustomerPhone] = useState(prefill?.customerPhone ?? "");
+  const [vehicleMakeModel, setVehicleMakeModel] = useState(
+    prefill?.vehicleMakeModel ?? ""
+  );
+  const [registrationNumber, setRegistrationNumber] = useState(
+    prefill?.registrationNumber ?? ""
+  );
   const [vehicleSize, setVehicleSize] = useState<DetailingVehicleSize>("standard");
   const [appointmentDate, setAppointmentDate] = useState(defaultAppointmentDate());
   const [appointmentTime, setAppointmentTime] = useState(defaultAppointmentTime());
@@ -197,6 +210,7 @@ export function DetailingNewOrderForm({
         customer_last_name: isInternalVehicle ? null : customerLastName,
         customer_phone: isInternalVehicle ? null : customerPhone,
         is_internal_vehicle: isInternalVehicle,
+        car_id: prefill?.carId ?? null,
         vehicle_make_model: vehicleMakeModel,
         registration_number: registrationNumber,
         vehicle_size: vehicleSize,

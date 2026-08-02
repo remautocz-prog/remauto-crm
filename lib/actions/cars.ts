@@ -18,6 +18,9 @@ import { CAR_STATUS_SOLD } from "@/lib/constants/status";
 import { createClient } from "@/lib/supabase/server";
 import type { Car, CarExpenseInput, CarFormInput } from "@/lib/types/cars";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
+import { getDetailingOrderById } from "@/lib/queries/detailing";
+import { getCarExpenseByDetailingOrderId } from "@/lib/queries/cars";
+import { buildServicesSummary } from "@/lib/detailing/validation";
 
 async function mapValidationIssuesToFieldErrors(
   issues: ReturnType<typeof collectCarValidationIssues>
@@ -266,6 +269,7 @@ export async function createCarExpenseAction(
   revalidatePath(`/cars/${carId}`);
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/finance");
   return { success: true };
 }
 
@@ -294,6 +298,74 @@ export async function updateCarExpenseAction(
   revalidatePath(`/cars/${carId}`);
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/finance");
+  return { success: true };
+}
+
+export async function addDetailingCostToCarExpenseAction(input: {
+  carId: number;
+  detailingOrderId: string;
+  amount: number;
+}): Promise<ActionResult> {
+  const t = await getTranslations("cars");
+
+  if (!input.amount || Number.isNaN(input.amount) || input.amount <= 0) {
+    return { success: false, error: t("detailingExpenseAmountRequired") };
+  }
+
+  const [order, existingExpense] = await Promise.all([
+    getDetailingOrderById(input.detailingOrderId),
+    getCarExpenseByDetailingOrderId(input.detailingOrderId),
+  ]);
+
+  if (!order) {
+    return { success: false, error: t("detailingOrderNotFound") };
+  }
+
+  if (order.car_id !== input.carId) {
+    return { success: false, error: t("detailingOrderNotLinked") };
+  }
+
+  if (order.status !== "delivered") {
+    return { success: false, error: t("detailingOrderNotDelivered") };
+  }
+
+  if (!order.final_price || order.final_price <= 0) {
+    return { success: false, error: t("detailingOrderNoFinalPrice") };
+  }
+
+  if (existingExpense) {
+    return { success: false, error: t("expenseAlreadyAdded") };
+  }
+
+  const servicesSummary = buildServicesSummary(order.services);
+  const description = `${order.order_number}${servicesSummary ? ` · ${servicesSummary}` : ""}`;
+  const expenseDate =
+    order.actual_completion_at?.slice(0, 10) ??
+    new Date().toISOString().slice(0, 10);
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("car_expenses").insert({
+    car_id: input.carId,
+    category: "detailing",
+    amount: input.amount,
+    description,
+    expense_date: expenseDate,
+    source_detailing_order_id: input.detailingOrderId,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { success: false, error: t("expenseAlreadyAdded") };
+    }
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidatePath(`/cars/${input.carId}`);
+  revalidatePath(`/detailing/orders/${input.detailingOrderId}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/finance");
+  revalidatePath("/reports");
   return { success: true };
 }
 
@@ -313,5 +385,6 @@ export async function deleteCarExpenseAction(
   revalidatePath(`/cars/${carId}`);
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/finance");
   return { success: true };
 }

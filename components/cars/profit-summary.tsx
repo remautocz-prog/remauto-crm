@@ -7,9 +7,11 @@ import {
   getFinanceSummaryTitleKey,
 } from "@/lib/cars/business-rules";
 import { DEFAULT_BUSINESS_MODEL } from "@/lib/constants/business-model";
+import { getProfitToneClass } from "@/lib/cars/display-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFormatters } from "@/lib/hooks/use-formatters";
 import { translateCommissionType } from "@/lib/i18n/business-model";
+import { cn } from "@/lib/utils";
 
 type ProfitSummaryProps = {
   car: Car;
@@ -20,10 +22,12 @@ function ProfitRow({
   label,
   value,
   accent,
+  toneClass,
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  toneClass?: string;
 }) {
   return (
     <div
@@ -35,13 +39,10 @@ function ProfitRow({
     >
       <span className={accent ? "text-zinc-300" : "text-zinc-400"}>{label}</span>
       <span
-        className={
-          accent
-            ? value.startsWith("-")
-              ? "font-semibold text-red-400"
-              : "font-semibold text-green-400"
-            : "text-white"
-        }
+        className={cn(
+          accent ? "font-semibold tabular-nums" : "text-white tabular-nums",
+          accent ? toneClass : undefined
+        )}
       >
         {value}
       </span>
@@ -61,6 +62,13 @@ export function ProfitSummary({ car, totalExpenses }: ProfitSummaryProps) {
   const title = t(getFinanceSummaryTitleKey(model));
   const estimatedLabel = tFields("estimated");
 
+  function resolveLabel(labelKey: string) {
+    if (labelKey === "projectedProfit" || labelKey === "finalProfit") {
+      return t(labelKey as "projectedProfit" | "finalProfit");
+    }
+    return tFields(labelKey as never);
+  }
+
   return (
     <Card className="border-zinc-800 bg-zinc-900/60">
       <CardHeader>
@@ -68,17 +76,25 @@ export function ProfitSummary({ car, totalExpenses }: ProfitSummaryProps) {
       </CardHeader>
       <CardContent className="grid gap-3 text-sm">
         {rows.map((row, index) => {
-          const label = tFields(row.labelKey);
+          const label = resolveLabel(row.labelKey);
           const formatted =
             row.amount == null
-              ? formatCurrency(0)
+              ? "—"
               : row.isEstimate
                 ? `${formatCurrency(row.amount)} (${estimatedLabel})`
                 : formatCurrency(row.amount);
+          const toneClass = row.accent
+            ? getProfitToneClass(row.amount, row.isEstimate)
+            : undefined;
 
           return (
             <div key={`${row.labelKey}-${index}`}>
-              <ProfitRow label={label} value={formatted} accent={row.accent} />
+              <ProfitRow
+                label={label}
+                value={formatted}
+                accent={row.accent}
+                toneClass={toneClass}
+              />
               {row.hint === "commissionType" && car.commission_type ? (
                 <p className="mt-1 text-xs text-zinc-500">
                   {translateCommissionType(tCommissionType, car.commission_type)}

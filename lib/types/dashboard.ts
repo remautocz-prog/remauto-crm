@@ -65,7 +65,10 @@ export type DashboardActivityKind =
   | "status_changed"
   | "priority_changed"
   | "employee_assigned"
-  | "payment_marked";
+  | "payment_marked"
+  | "detailing_created"
+  | "detailing_status_changed"
+  | "expense_added";
 
 export type DashboardActivityItem = {
   id: string;

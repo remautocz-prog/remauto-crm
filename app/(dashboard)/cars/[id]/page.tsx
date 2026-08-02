@@ -13,6 +13,7 @@ import { getDocumentTasksByCarId } from "@/lib/queries/documents";
 import { getDocumentTemplates } from "@/lib/queries/document-templates";
 import { getGeneratedDocuments } from "@/lib/queries/generated-documents";
 import { getDealsByVehicleId } from "@/lib/queries/deals";
+import { getDetailingOrdersByCarId } from "@/lib/queries/detailing";
 
 type CarDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -49,6 +50,13 @@ async function loadCarDetail(carId: number) {
     getDealsByVehicleId(carId),
   ]);
 
+  let detailingOrders: Awaited<ReturnType<typeof getDetailingOrdersByCarId>> = [];
+  try {
+    detailingOrders = await getDetailingOrdersByCarId(carId);
+  } catch {
+    detailingOrders = [];
+  }
+
   const [client, owner, manager] = await Promise.all([
     car.client_id ? getClientById(car.client_id) : Promise.resolve(null),
     car.owner_client_id ? getClientById(car.owner_client_id) : Promise.resolve(null),
@@ -63,6 +71,7 @@ async function loadCarDetail(carId: number) {
     documentTemplates,
     generatedDocuments,
     deals,
+    detailingOrders,
     clientName: client?.full_name ?? null,
     ownerName: owner?.full_name ?? null,
     managerName: manager?.full_name ?? null,
@@ -94,6 +103,7 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
       documentTemplates={data.documentTemplates}
       generatedDocuments={data.generatedDocuments}
       deals={data.deals}
+      detailingOrders={data.detailingOrders}
     />
   );
 }

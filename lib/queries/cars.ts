@@ -9,15 +9,42 @@ export async function getCars(params: CarsListParams = {}) {
     query = query.eq("status", params.status);
   }
 
+  if (params.inventory === "active") {
+    query = query.neq("status", "sold");
+  } else if (params.inventory === "sold") {
+    query = query.eq("status", "sold");
+  }
+
   if (params.business_model && params.business_model !== "all") {
     query = query.eq("business_model", params.business_model);
   }
 
   if (params.q?.trim()) {
-    const term = `%${params.q.trim()}%`;
-    query = query.or(
-      `vin.ilike.${term},brand.ilike.${term},model.ilike.${term},registration_number.ilike.${term},stock_number.ilike.${term}`
-    );
+    const term = params.q.trim();
+    const like = `%${term}%`;
+    const orParts = [
+      `vin.ilike.${like}`,
+      `brand.ilike.${like}`,
+      `model.ilike.${like}`,
+      `registration_number.ilike.${like}`,
+      `stock_number.ilike.${like}`,
+    ];
+
+    const { data: matchingClients } = await supabase
+      .from("clients")
+      .select("id")
+      .or(`full_name.ilike.${like},company.ilike.${like},email.ilike.${like}`);
+
+    const clientIds = (matchingClients ?? [])
+      .map((client) => Number(client.id))
+      .filter((id) => Number.isFinite(id));
+
+    if (clientIds.length > 0) {
+      orParts.push(`client_id.in.(${clientIds.join(",")})`);
+      orParts.push(`owner_client_id.in.(${clientIds.join(",")})`);
+    }
+
+    query = query.or(orParts.join(","));
   }
 
   switch (params.sort) {
@@ -53,6 +80,20 @@ export async function getCarById(id: number) {
 
   if (error) throw error;
   return data as Car;
+}
+
+export async function getCarExpenseByDetailingOrderId(
+  detailingOrderId: string
+): Promise<CarExpense | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("car_expenses")
+    .select("*")
+    .eq("source_detailing_order_id", detailingOrderId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? (data as CarExpense) : null;
 }
 
 export async function getCarExpenses(carId: number) {

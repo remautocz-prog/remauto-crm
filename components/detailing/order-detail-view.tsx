@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -23,12 +24,16 @@ import { DetailingStatusBadge } from "@/components/detailing/status-badge";
 import { DetailingSection, DetailingTable } from "@/components/detailing/detailing-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AddDetailingCostDialog } from "@/components/cars/add-detailing-cost-dialog";
+import type { CarExpense } from "@/lib/types/cars";
+
 import { useFormatters } from "@/lib/hooks/use-formatters";
 
 type DetailingOrderDetailViewProps = {
   order: DetailingOrderWithServices;
   services: DetailingService[];
   employees: DetailingEmployeeWithProfile[];
+  linkedCarExpense?: CarExpense | null;
 };
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -44,6 +49,7 @@ export function DetailingOrderDetailView({
   order,
   services,
   employees,
+  linkedCarExpense = null,
 }: DetailingOrderDetailViewProps) {
   const t = useTranslations("detailing");
   const router = useRouter();
@@ -111,6 +117,16 @@ export function DetailingOrderDetailView({
           <p className="mt-1 text-sm text-zinc-400">
             {t("fields.employee")}: {employeeNames}
           </p>
+          {order.car_id ? (
+            <p className="mt-1 text-sm">
+              <Link
+                href={`/cars/${order.car_id}`}
+                className="text-red-400 hover:text-red-300"
+              >
+                {t("linkedVehicle")} →
+              </Link>
+            </p>
+          ) : null}
         </div>
         <Button variant="outline" onClick={() => setEditing(true)}>
           <Pencil className="mr-2 h-4 w-4" />
@@ -140,6 +156,10 @@ export function DetailingOrderDetailView({
             {t("actions.cancelOrder")}
           </Button>
         </div>
+      ) : null}
+
+      {isDelivered && order.car_id ? (
+        <AddDetailingCostDialog order={order} existingExpense={linkedCarExpense} />
       ) : null}
 
       {message ? (

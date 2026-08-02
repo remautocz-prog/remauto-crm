@@ -54,5 +54,6 @@ export const DASHBOARD_QUICK_ACTION_LINKS = {
   newCar: "/cars/new",
   newClient: "/clients",
   newDocumentOrder: "/documents",
+  newDetailingOrder: "/detailing/orders/new",
   viewOverdueOrders: getDocumentsFilterHref({ overdue: true }),
 } as const;

@@ -46,6 +46,7 @@ export type CarExpense = {
   amount: number;
   description: string | null;
   expense_date: string;
+  source_detailing_order_id?: string | null;
   created_at: string;
 };
 
@@ -87,6 +88,7 @@ export type CarExpenseInput = {
   amount: number;
   description?: string | null;
   expense_date: string;
+  source_detailing_order_id?: string | null;
 };
 
 export type Profile = {
@@ -104,6 +106,7 @@ export type CarsListParams = {
   q?: string;
   status?: string;
   business_model?: string;
+  inventory?: "active" | "sold";
   sort?: string;
 };
 

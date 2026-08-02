@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { summarizeCarExpenses } from "@/lib/cars/display-helpers";
 import { useFormatters } from "@/lib/hooks/use-formatters";
 import { translateExpenseCategory } from "@/lib/i18n/status";
 
@@ -47,6 +48,10 @@ export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
   const totalExpenses = expenses.reduce(
     (sum, expense) => sum + Number(expense.amount),
     0
+  );
+
+  const summary = summarizeCarExpenses(expenses, (category) =>
+    translateExpenseCategory(tExpenseCategories, category as never)
   );
 
   function handleDelete() {
@@ -85,6 +90,55 @@ export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {expenses.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+              <p className="text-xs text-zinc-500">{tFields("totalExpenses")}</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-white">
+                {formatCurrency(summary.total)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+              <p className="text-xs text-zinc-500">{t("largestExpenseCategory")}</p>
+              <p className="mt-1 text-sm font-medium text-zinc-200">
+                {summary.largestCategory ?? dash}
+              </p>
+              {summary.largestCategory ? (
+                <p className="text-xs tabular-nums text-zinc-500">
+                  {formatCurrency(summary.largestCategoryAmount)}
+                </p>
+              ) : null}
+            </div>
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+              <p className="text-xs text-zinc-500">{t("latestExpense")}</p>
+              {summary.latestExpense ? (
+                <>
+                  <p className="mt-1 text-sm font-medium text-zinc-200">
+                    {translateExpenseCategory(
+                      tExpenseCategories,
+                      summary.latestExpense.category
+                    )}
+                  </p>
+                  <p className="text-xs tabular-nums text-zinc-500">
+                    {formatCurrency(Number(summary.latestExpense.amount))} ·{" "}
+                    {formatDate(summary.latestExpense.expense_date, dash)}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-zinc-500">{dash}</p>
+              )}
+            </div>
+            {summary.thirdPartyCommissionTotal > 0 ? (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+                <p className="text-xs text-zinc-500">{t("thirdPartyCommissionTotal")}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-white">
+                  {formatCurrency(summary.thirdPartyCommissionTotal)}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {error ? (
           <p className="rounded-md border border-red-600/30 bg-red-600/10 px-3 py-2 text-sm text-red-400">
             {error}
@@ -98,27 +152,27 @@ export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
             <table className="w-full text-left text-sm">
               <thead className="bg-zinc-950/80 text-zinc-400">
                 <tr>
-                  <th className="px-4 py-3 font-medium">{tFields("category")}</th>
-                  <th className="px-4 py-3 font-medium">{tFields("amount")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("date")}</th>
+                  <th className="px-4 py-3 font-medium">{tFields("category")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("description")}</th>
+                  <th className="px-4 py-3 font-medium">{tFields("amount")}</th>
                   <th className="px-4 py-3 font-medium" />
                 </tr>
               </thead>
               <tbody>
                 {expenses.map((expense) => (
                   <tr key={expense.id} className="border-t border-zinc-800/80">
-                    <td className="px-4 py-3 text-zinc-200">
-                      {translateExpenseCategory(tExpenseCategories, expense.category)}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-200">
-                      {formatCurrency(Number(expense.amount))}
-                    </td>
                     <td className="px-4 py-3 text-zinc-300">
                       {formatDate(expense.expense_date, dash)}
                     </td>
+                    <td className="px-4 py-3 text-zinc-200">
+                      {translateExpenseCategory(tExpenseCategories, expense.category)}
+                    </td>
                     <td className="px-4 py-3 text-zinc-400">
                       {expense.description ?? dash}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-200">
+                      {formatCurrency(Number(expense.amount))}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">

@@ -4,8 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { Car, ClientOption } from "@/lib/types/cars";
+import { getCarStatusRowStripe } from "@/lib/cars/display-helpers";
 import { CarStatusControl } from "@/components/cars/car-status-control";
 import { DashboardSectionState } from "@/components/dashboard/dashboard-section-state";
+import { cn } from "@/lib/utils";
 
 type DashboardRecentVehiclesSectionProps = {
   cars: Car[];
@@ -44,24 +46,32 @@ export function DashboardRecentVehiclesSection({
       ) : null}
       <ul className="divide-y divide-zinc-800">
         {cars.map((car) => (
-          <li key={car.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-            <div className="min-w-0">
-              <Link
-                href={`/cars/${car.id}`}
-                className="truncate text-sm font-medium text-white hover:text-red-400"
-              >
-                {car.brand} {car.model} ({car.year})
-              </Link>
-              {car.stock_number ? (
-                <p className="truncate text-xs text-zinc-500">{car.stock_number}</p>
-              ) : null}
+          <li
+            key={car.id}
+            className={cn(
+              "border-l-4 py-3 pl-3 first:pt-0 last:pb-0",
+              getCarStatusRowStripe(car.status)
+            )}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <Link
+                  href={`/cars/${car.id}`}
+                  className="truncate text-sm font-semibold text-white hover:text-red-400"
+                >
+                  {car.brand} {car.model} ({car.year})
+                </Link>
+                {car.registration_number ? (
+                  <p className="truncate text-xs text-zinc-500">{car.registration_number}</p>
+                ) : null}
+              </div>
+              <CarStatusControl
+                car={car}
+                clients={clients}
+                compact
+                onToast={setToast}
+              />
             </div>
-            <CarStatusControl
-              car={car}
-              clients={clients}
-              compact
-              onToast={setToast}
-            />
           </li>
         ))}
       </ul>

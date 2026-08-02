@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Car, FileText, UserPlus, AlertTriangle } from "lucide-react";
+import { Car, FileText, Sparkles, UserPlus } from "lucide-react";
 import { getPragueTodayDateString } from "@/lib/documents/deadline";
 import { DASHBOARD_QUICK_ACTION_LINKS } from "@/lib/dashboard/links";
 import { useFormatters } from "@/lib/hooks/use-formatters";
@@ -10,10 +10,12 @@ import { Button } from "@/components/ui/button";
 
 type DashboardHeaderProps = {
   userName?: string | null;
+  title?: string;
 };
 
-export function DashboardHeader({ userName }: DashboardHeaderProps) {
+export function DashboardHeader({ userName, title }: DashboardHeaderProps) {
   const t = useTranslations("dashboard");
+  const tOwner = useTranslations("dashboard.owner");
   const { formatDate } = useFormatters();
   const today = getPragueTodayDateString();
 
@@ -22,6 +24,11 @@ export function DashboardHeader({ userName }: DashboardHeaderProps) {
       href: DASHBOARD_QUICK_ACTION_LINKS.newCar,
       label: t("newCar"),
       icon: Car,
+    },
+    {
+      href: DASHBOARD_QUICK_ACTION_LINKS.newDetailingOrder,
+      label: tOwner("newDetailingOrder"),
+      icon: Sparkles,
     },
     {
       href: DASHBOARD_QUICK_ACTION_LINKS.newClient,
@@ -33,11 +40,6 @@ export function DashboardHeader({ userName }: DashboardHeaderProps) {
       label: t("newDocumentOrder"),
       icon: FileText,
     },
-    {
-      href: DASHBOARD_QUICK_ACTION_LINKS.viewOverdueOrders,
-      label: t("viewOverdueOrders"),
-      icon: AlertTriangle,
-    },
   ];
 
   return (
@@ -45,7 +47,7 @@ export function DashboardHeader({ userName }: DashboardHeaderProps) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
-            {userName ? `${t("welcome")}, ${userName}` : t("dashboardOverview")}
+            {title ?? (userName ? `${t("welcome")}, ${userName}` : t("dashboardOverview"))}
           </h2>
           <p className="text-sm text-zinc-400">{formatDate(today)}</p>
         </div>

@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, BadgeCheck, ExternalLink, Pencil } from "lucide-react";
+import { ArrowLeft, BadgeCheck, ExternalLink, Pencil, Sparkles } from "lucide-react";
 import type { Car, CarExpense, ClientOption } from "@/lib/types/cars";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 import { DocumentsSection } from "@/components/documents/documents-section";
 import { GeneratedDocumentsPanel } from "@/components/document-generator/generated-documents-panel";
+import { CarDetailingSection } from "@/components/cars/car-detailing-section";
+import { CarNextActionPanel } from "@/components/cars/car-next-action-panel";
+import { CarSaleDocumentsPanel } from "@/components/cars/car-sale-documents-panel";
 import { DEFAULT_BUSINESS_MODEL } from "@/lib/constants/business-model";
+import { CAR_STATUS_SOLD } from "@/lib/constants/status";
+import type { DetailingOrderWithServices } from "@/lib/types/detailing";
 import { DealsSection } from "@/components/deals/deals-section";
 import type { DealWithRelations } from "@/lib/types/deals";
 import type { DocumentTemplate, GeneratedDocument } from "@/lib/types/document-templates";
@@ -16,12 +21,14 @@ import { formatGrossCommissionDisplay } from "@/lib/cars/business-rules";
 import { CarStatusBadge } from "@/components/cars/car-status-badge";
 import { BusinessModelBadge } from "@/components/cars/business-model-badge";
 import { CarExpensesSection } from "@/components/cars/car-expenses-section";
+import { CarFinanceCards } from "@/components/cars/car-finance-cards";
 import { DeleteCarButton } from "@/components/cars/delete-car-button";
 import { MarkSoldDialog } from "@/components/cars/mark-sold-dialog";
-import { ProfitSummary } from "@/components/cars/profit-summary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFormatters } from "@/lib/hooks/use-formatters";
+import { getCarStatusRowStripe } from "@/lib/cars/display-helpers";
+import { cn } from "@/lib/utils";
 import { translateBusinessModel, translateCommissionType } from "@/lib/i18n/business-model";
 
 type CarDetailsProps = {
@@ -35,6 +42,7 @@ type CarDetailsProps = {
   documentTemplates?: DocumentTemplate[];
   generatedDocuments?: GeneratedDocument[];
   deals?: DealWithRelations[];
+  detailingOrders?: DetailingOrderWithServices[];
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -57,6 +65,7 @@ export function CarDetails({
   documentTemplates = [],
   generatedDocuments = [],
   deals = [],
+  detailingOrders = [],
 }: CarDetailsProps) {
   const [soldOpen, setSoldOpen] = useState(false);
   const tDocuments = useTranslations("documents");
@@ -76,6 +85,13 @@ export function CarDetails({
   const { formatCurrency, formatDate, formatDateTime } = useFormatters();
   const dash = tCommon("dash");
 
+  const scrollToSaleDocuments = useCallback(() => {
+    document.getElementById("sale-documents")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -94,9 +110,19 @@ export function CarDetails({
               <CarStatusBadge status={car.status} />
               <BusinessModelBadge businessModel={model} />
             </div>
-            <p className="text-zinc-400">
+            <p className="mt-1 text-sm text-zinc-400">
               {car.year} {t("yearSuffix")}
-              {car.stock_number ? ` • ${car.stock_number}` : ""}
+              {car.stock_number ? ` · ${car.stock_number}` : ""}
+            </p>
+            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400">
+              <span>
+                {tFields("vin")}:{" "}
+                <span className="font-mono text-zinc-300">{car.vin ?? dash}</span>
+              </span>
+              <span>
+                {tFields("registrationNumber")}:{" "}
+                <span className="text-zinc-300">{car.registration_number ?? dash}</span>
+              </span>
             </p>
           </div>
         </div>
@@ -106,6 +132,12 @@ export function CarDetails({
             <Link href={`/cars/${car.id}/edit`}>
               <Pencil className="h-4 w-4" />
               {tActions("edit")}
+            </Link>
+          </Button>
+          <Button asChild variant="secondary">
+            <Link href={`/detailing/orders/new?car_id=${car.id}`}>
+              <Sparkles className="h-4 w-4" />
+              {t("sendToDetailing")}
             </Link>
           </Button>
           {car.status !== "sold" ? (
@@ -118,8 +150,25 @@ export function CarDetails({
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <Card className="border-zinc-800 bg-zinc-900/60 xl:col-span-2">
+      <CarFinanceCards car={car} totalExpenses={totalExpenses} />
+
+      <CarNextActionPanel
+        car={car}
+        expenses={expenses}
+        documentTasks={documentTasks}
+        detailingOrders={detailingOrders}
+        generatedDocuments={generatedDocuments}
+        documentTemplates={documentTemplates}
+        onMarkSold={() => setSoldOpen(true)}
+        onScrollToSaleDocuments={scrollToSaleDocuments}
+      />
+
+      <Card
+        className={cn(
+          "border-zinc-800 border-l-4 bg-zinc-900/60",
+          getCarStatusRowStripe(car.status)
+        )}
+      >
           <CardHeader>
             <CardTitle className="text-base text-white">{t("detailsTitle")}</CardTitle>
           </CardHeader>
@@ -301,15 +350,22 @@ export function CarDetails({
           </CardContent>
         </Card>
 
-        <ProfitSummary car={car} totalExpenses={totalExpenses} />
-      </div>
-
       {(model === "owned" || model === "commission" || model === "client_order") && (
         <CarExpensesSection car={car} expenses={expenses} />
       )}
 
+      <CarDetailingSection carId={car.id} orders={detailingOrders} />
+
+      {car.status === CAR_STATUS_SOLD ? (
+        <CarSaleDocumentsPanel
+          vehicleId={car.id}
+          clientId={car.client_id}
+          templates={documentTemplates}
+        />
+      ) : null}
+
       <DocumentsSection
-        title={tDocuments("title")}
+        title={t("relatedDocuments")}
         tasks={documentTasks}
         createHref={`/documents?car_id=${car.id}${car.client_id ? `&client_id=${car.client_id}` : ""}`}
         emptyMessage={tDocuments("empty")}

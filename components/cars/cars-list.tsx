@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Loader2, Plus, Search } from "lucide-react";
+import { Loader2, Plus, Search, X } from "lucide-react";
 import type { Car, ClientOption } from "@/lib/types/cars";
 import {
   CAR_SORT_VALUES,
@@ -13,11 +13,17 @@ import {
 } from "@/lib/constants/cars";
 import { BUSINESS_MODEL_VALUES } from "@/lib/constants/business-model";
 import { getListRowDisplay } from "@/lib/cars/business-rules";
+import {
+  getCarStatusRowStripe,
+  getProfitLabelKey,
+  resolveActualSalePrice,
+} from "@/lib/cars/display-helpers";
 import { BusinessModelBadge } from "@/components/cars/business-model-badge";
 import { CarStatusControl } from "@/components/cars/car-status-control";
+import { ProfitAmount } from "@/components/cars/profit-amount";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -25,9 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useFormatters } from "@/lib/hooks/use-formatters";
 import { translateBusinessModel } from "@/lib/i18n/business-model";
 import { translateStatus } from "@/lib/i18n/status";
+import { cn } from "@/lib/utils";
 
 const SORT_LABEL_KEYS: Record<CarSortValue, "newest" | "purchaseDate" | "price" | "saleDate"> = {
   newest: "newest",
@@ -44,6 +52,7 @@ type CarsListProps = {
   initialQuery: string;
   initialStatus: string;
   initialBusinessModel: string;
+  initialInventory: string;
   initialSort: string;
 };
 
@@ -59,31 +68,6 @@ function formatListAmount(
   return isEstimate ? `${formatted} (${estimatedLabel})` : formatted;
 }
 
-function getTableHeaders(
-  businessModel: string,
-  labels: {
-    purchasePrice: string;
-    salePrice: string;
-    netProfit: string;
-    ownerNetAmount: string;
-    expectedCommission: string;
-    client: string;
-    primaryAmount: string;
-    secondaryAmount: string;
-  }
-): [string, string, string] {
-  if (businessModel === "owned") {
-    return [labels.purchasePrice, labels.salePrice, labels.netProfit];
-  }
-  if (businessModel === "commission") {
-    return [labels.ownerNetAmount, labels.expectedCommission, labels.netProfit];
-  }
-  if (businessModel === "client_order") {
-    return [labels.client, labels.expectedCommission, labels.netProfit];
-  }
-  return [labels.primaryAmount, labels.secondaryAmount, labels.netProfit];
-}
-
 export function CarsList({
   cars,
   clientNames,
@@ -92,6 +76,7 @@ export function CarsList({
   initialQuery,
   initialStatus,
   initialBusinessModel,
+  initialInventory,
   initialSort,
 }: CarsListProps) {
   const router = useRouter();
@@ -99,10 +84,12 @@ export function CarsList({
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState(initialStatus);
   const [businessModel, setBusinessModel] = useState(initialBusinessModel);
+  const [inventory, setInventory] = useState(initialInventory);
   const [sort, setSort] = useState(initialSort);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(
     null
   );
+  const debouncedQuery = useDebouncedValue(query, 350);
 
   const t = useTranslations("cars");
   const tActions = useTranslations("actions");
@@ -111,36 +98,34 @@ export function CarsList({
   const tStatus = useTranslations("status");
   const tBusinessModel = useTranslations("businessModel");
   const tCommon = useTranslations("common");
-  const { formatCurrency, formatDate } = useFormatters();
+  const { formatCurrency } = useFormatters();
   const dash = tCommon("dash");
   const estimatedLabel = tFields("estimated");
-  const [col1, col2, col3] = getTableHeaders(businessModel, {
-    purchasePrice: tFields("purchasePrice"),
-    salePrice: tFields("salePrice"),
-    netProfit: tFields("netProfit"),
-    ownerNetAmount: tFields("ownerNetAmount"),
-    expectedCommission: tFields("expectedCommission"),
-    client: tFields("client"),
-    primaryAmount: tFields("primaryAmount"),
-    secondaryAmount: tFields("secondaryAmount"),
-  });
+
+  const showOwnedColumns =
+    businessModel === "all" || businessModel === "owned";
 
   function applyFilters(next: {
     q?: string;
     status?: string;
     business_model?: string;
+    inventory?: string;
     sort?: string;
   }) {
     const params = new URLSearchParams();
     const q = next.q ?? query;
     const nextStatus = next.status ?? status;
     const nextBusinessModel = next.business_model ?? businessModel;
+    const nextInventory = next.inventory ?? inventory;
     const nextSort = next.sort ?? sort;
 
     if (q.trim()) params.set("q", q.trim());
     if (nextStatus && nextStatus !== "all") params.set("status", nextStatus);
     if (nextBusinessModel && nextBusinessModel !== "all") {
       params.set("business_model", nextBusinessModel);
+    }
+    if (nextInventory && nextInventory !== "all") {
+      params.set("inventory", nextInventory);
     }
     if (nextSort && nextSort !== "newest") params.set("sort", nextSort);
 
@@ -149,16 +134,39 @@ export function CarsList({
     });
   }
 
+  useEffect(() => {
+    if (debouncedQuery === initialQuery) return;
+    applyFilters({ q: debouncedQuery });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery]);
+
   const hasFilters = useMemo(
     () =>
       Boolean(
         initialQuery ||
           (initialStatus && initialStatus !== "all") ||
           (initialBusinessModel && initialBusinessModel !== "all") ||
+          (initialInventory && initialInventory !== "all") ||
           (initialSort && initialSort !== "newest")
       ),
-    [initialBusinessModel, initialQuery, initialSort, initialStatus]
+    [initialBusinessModel, initialInventory, initialQuery, initialSort, initialStatus]
   );
+
+  function resetFilters() {
+    setQuery("");
+    setStatus("all");
+    setBusinessModel("all");
+    setInventory("all");
+    setSort("newest");
+    startTransition(() => router.push("/cars"));
+  }
+
+  function resolveFieldLabel(key: string) {
+    if (key === "projectedProfit" || key === "finalProfit") {
+      return t(key);
+    }
+    return tFields(key as "purchasePrice");
+  }
 
   function renderPrimaryCell(
     car: Car,
@@ -178,6 +186,19 @@ export function CarsList({
     );
   }
 
+  function renderCarFinancials(car: Car) {
+    const totalExpenses = expenseTotals[car.id] ?? 0;
+    const display = getListRowDisplay(
+      car,
+      totalExpenses,
+      car.client_id ? clientNames[car.client_id] : null
+    );
+    const actualSale = resolveActualSalePrice(car);
+    const profitLabelKey = getProfitLabelKey(car);
+
+    return { totalExpenses, display, actualSale, profitLabelKey };
+  }
+
   return (
     <div className="space-y-6">
       {toast ? (
@@ -192,6 +213,7 @@ export function CarsList({
           {toast.message}
         </p>
       ) : null}
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">{t("title")}</h2>
@@ -205,16 +227,15 @@ export function CarsList({
         </Button>
       </div>
 
-      <Card className="border-zinc-800 bg-zinc-900/60">
-        <CardContent className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-5">
-          <div className="space-y-2 md:col-span-2 xl:col-span-2">
+      <Card className="sticky top-0 z-20 border-zinc-800 bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/75">
+        <CardContent className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="space-y-2 md:col-span-2">
             <label className="text-sm text-zinc-400">{tActions("search")}</label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applyFilters({ q: query })}
                 placeholder={t("searchPlaceholder")}
                 className="pl-9"
               />
@@ -245,7 +266,7 @@ export function CarsList({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm text-zinc-400">{tFields("businessModel")}</label>
+            <label className="text-sm text-zinc-400">{t("ownershipType")}</label>
             <Select
               value={businessModel}
               onValueChange={(value) => {
@@ -263,6 +284,26 @@ export function CarsList({
                     {translateBusinessModel(tBusinessModel, value)}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm text-zinc-400">{t("inventoryFilter")}</label>
+            <Select
+              value={inventory}
+              onValueChange={(value) => {
+                setInventory(value);
+                applyFilters({ inventory: value });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={tFields("allStatuses")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{tFields("allStatuses")}</SelectItem>
+                <SelectItem value="active">{t("activeVehicles")}</SelectItem>
+                <SelectItem value="sold">{t("soldVehicles")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -289,16 +330,14 @@ export function CarsList({
             </Select>
           </div>
 
-          <div className="md:col-span-2 xl:col-span-5">
-            <Button
-              variant="secondary"
-              onClick={() => applyFilters({ q: query })}
-              disabled={isPending}
-            >
-              {isPending ? <Loader2 className="animate-spin" /> : null}
-              {tActions("applyFilters")}
-            </Button>
-          </div>
+          {hasFilters ? (
+            <div className="flex items-end md:col-span-2 xl:col-span-6">
+              <Button variant="ghost" size="sm" onClick={resetFilters} disabled={isPending}>
+                <X className="h-4 w-4" />
+                {t("resetFilters")}
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -333,42 +372,52 @@ export function CarsList({
                 <tr>
                   <th className="px-4 py-3 font-medium">{tFields("car")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("vin")}</th>
-                  <th className="px-4 py-3 font-medium">
-                    {tFields("registrationNumber")}
-                  </th>
-                  <th className="px-4 py-3 font-medium">{tFields("businessModel")}</th>
+                  <th className="px-4 py-3 font-medium">{tFields("registrationNumber")}</th>
+                  <th className="px-4 py-3 font-medium">{t("ownershipType")}</th>
                   <th className="px-4 py-3 font-medium">{tFields("status")}</th>
-                  <th className="px-4 py-3 font-medium">{col1}</th>
-                  <th className="px-4 py-3 font-medium">{col2}</th>
-                  <th className="px-4 py-3 font-medium">{col3}</th>
+                  <th className="px-4 py-3 font-medium">
+                    {showOwnedColumns ? tFields("purchasePrice") : tFields("ownerNetAmount")}
+                  </th>
+                  <th className="px-4 py-3 font-medium">
+                    {showOwnedColumns
+                      ? tFields("plannedSalePrice")
+                      : tFields("expectedCommission")}
+                  </th>
+                  {showOwnedColumns ? (
+                    <th className="px-4 py-3 font-medium">{tFields("actualSalePrice")}</th>
+                  ) : null}
+                  <th className="px-4 py-3 font-medium">{tFields("totalExpenses")}</th>
+                  <th className="px-4 py-3 font-medium">{tFields("netProfit")}</th>
                 </tr>
               </thead>
               <tbody>
                 {cars.map((car) => {
-                  const totalExpenses = expenseTotals[car.id] ?? 0;
-                  const display = getListRowDisplay(
-                    car,
-                    totalExpenses,
-                    car.client_id ? clientNames[car.client_id] : null
-                  );
+                  const { totalExpenses, display, actualSale, profitLabelKey } =
+                    renderCarFinancials(car);
 
                   return (
                     <tr
                       key={car.id}
-                      className="border-t border-zinc-800/80 hover:bg-zinc-900/50"
+                      className={cn(
+                        "border-t border-zinc-800/80 border-l-4 hover:bg-zinc-900/50",
+                        getCarStatusRowStripe(car.status)
+                      )}
                     >
                       <td className="px-4 py-3">
                         <Link
                           href={`/cars/${car.id}`}
-                          className="font-medium text-white hover:text-red-400"
+                          className="text-base font-semibold text-white hover:text-red-400"
                         >
-                          {car.brand} {car.model} ({car.year})
+                          {car.brand} {car.model}
                         </Link>
-                        {car.stock_number ? (
-                          <p className="text-xs text-zinc-500">{car.stock_number}</p>
-                        ) : null}
+                        <p className="text-xs text-zinc-500">
+                          {car.year} {t("yearSuffix")}
+                          {car.stock_number ? ` · ${car.stock_number}` : ""}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-zinc-300">{car.vin ?? dash}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-zinc-300">
+                        {car.vin ?? dash}
+                      </td>
                       <td className="px-4 py-3 text-zinc-300">
                         {car.registration_number ?? dash}
                       </td>
@@ -395,14 +444,27 @@ export function CarsList({
                           dash
                         )}
                       </td>
+                      {showOwnedColumns ? (
+                        <td className="px-4 py-3 text-zinc-300">
+                          {actualSale != null ? formatCurrency(actualSale) : dash}
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 text-zinc-300">
-                        {formatListAmount(
-                          display.profit.amount,
-                          display.profit.isEstimate,
-                          formatCurrency,
-                          estimatedLabel,
-                          dash
-                        )}
+                        {formatCurrency(totalExpenses)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+                            {t(profitLabelKey)}
+                          </p>
+                          <ProfitAmount
+                            amount={display.profit.amount}
+                            isEstimate={display.profit.isEstimate}
+                            formatCurrency={formatCurrency}
+                            estimatedLabel={estimatedLabel}
+                            dash={dash}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -411,30 +473,33 @@ export function CarsList({
             </table>
           </div>
 
-          <div className="grid gap-4 lg:hidden">
+          <div className="grid gap-3 lg:hidden">
             {cars.map((car) => {
-              const totalExpenses = expenseTotals[car.id] ?? 0;
-              const display = getListRowDisplay(
-                car,
-                totalExpenses,
-                car.client_id ? clientNames[car.client_id] : null
-              );
+              const { totalExpenses, display, profitLabelKey } = renderCarFinancials(car);
 
               return (
-                <Card key={car.id} className="border-zinc-800 bg-zinc-900/60">
-                  <CardHeader className="space-y-3">
+                <Link
+                  key={car.id}
+                  href={`/cars/${car.id}`}
+                  className={cn(
+                    "block overflow-hidden rounded-xl border border-zinc-800 border-l-4 bg-zinc-900/60 transition-colors hover:bg-zinc-900/80",
+                    getCarStatusRowStripe(car.status)
+                  )}
+                >
+                  <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-base text-white">
-                          <Link href={`/cars/${car.id}`} className="hover:text-red-400">
-                            {car.brand} {car.model}
-                          </Link>
-                        </CardTitle>
+                      <div className="min-w-0">
+                        <p className="truncate text-lg font-semibold text-white">
+                          {car.brand} {car.model}
+                        </p>
                         <p className="text-sm text-zinc-400">
-                          {car.year} {t("yearSuffix")}
+                          {car.registration_number ?? car.vin ?? dash}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
+                      <div
+                        className="flex shrink-0 flex-col items-end gap-2"
+                        onClick={(event) => event.preventDefault()}
+                      >
                         <BusinessModelBadge businessModel={car.business_model} />
                         <CarStatusControl
                           car={car}
@@ -444,50 +509,31 @@ export function CarsList({
                         />
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="grid gap-2 text-sm text-zinc-300">
-                    <div className="flex justify-between gap-3">
-                      <span className="text-zinc-500">{tFields("vin")}</span>
-                      <span>{car.vin ?? dash}</span>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-xs text-zinc-500">{resolveFieldLabel(display.primaryLabelKey)}</p>
+                        <p className="mt-1 text-zinc-200">{renderPrimaryCell(car, display)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-zinc-500">{t(profitLabelKey)}</p>
+                        <div className="mt-1">
+                          <ProfitAmount
+                            amount={display.profit.amount}
+                            isEstimate={display.profit.isEstimate}
+                            formatCurrency={formatCurrency}
+                            estimatedLabel={estimatedLabel}
+                            dash={dash}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between gap-3">
-                      <span className="text-zinc-500">{tFields("registrationNumber")}</span>
-                      <span>{car.registration_number ?? dash}</span>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <span className="text-zinc-500">{tFields("purchaseDate")}</span>
-                      <span>{formatDate(car.purchase_date, dash)}</span>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <span className="text-zinc-500">{tFields(display.primaryLabelKey)}</span>
-                      <span>{renderPrimaryCell(car, display)}</span>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <span className="text-zinc-500">{tFields(display.secondaryLabelKey)}</span>
-                      <span>
-                        {formatListAmount(
-                          display.secondary.amount,
-                          display.secondary.isEstimate,
-                          formatCurrency,
-                          estimatedLabel,
-                          dash
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <span className="text-zinc-500">{tFields(display.profitLabelKey)}</span>
-                      <span>
-                        {formatListAmount(
-                          display.profit.amount,
-                          display.profit.isEstimate,
-                          formatCurrency,
-                          estimatedLabel,
-                          dash
-                        )}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+
+                    <p className="mt-3 text-xs text-zinc-500">
+                      {tFields("totalExpenses")}: {formatCurrency(totalExpenses)}
+                    </p>
+                  </div>
+                </Link>
               );
             })}
           </div>

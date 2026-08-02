@@ -44,6 +44,7 @@ export type DetailingOrderService = {
 export type DetailingOrder = {
   id: string;
   order_number: string;
+  car_id: number | null;
   customer_first_name: string | null;
   customer_last_name: string | null;
   customer_phone: string | null;
@@ -129,6 +130,7 @@ export type DetailingOrderFormInput = {
   customer_last_name?: string | null;
   customer_phone?: string | null;
   is_internal_vehicle?: boolean;
+  car_id?: number | null;
   vehicle_make_model: string;
   registration_number: string;
   vehicle_size: DetailingVehicleSize;
@@ -148,6 +150,16 @@ export type DetailingOrderFormInput = {
   deposit_amount?: number | null;
   paid_amount?: number | null;
   final_price_override?: number | null;
+};
+
+export type DetailingOrderPrefill = {
+  carId?: number;
+  vehicleMakeModel?: string;
+  registrationNumber?: string;
+  isInternalVehicle?: boolean;
+  customerFirstName?: string;
+  customerLastName?: string;
+  customerPhone?: string;
 };
 
 export type DetailingDashboardStats = {

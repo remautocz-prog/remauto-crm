@@ -15,6 +15,7 @@ type CarsPageProps = {
     q?: string;
     status?: string;
     business_model?: string;
+    inventory?: string;
     sort?: string;
   }>;
 };
@@ -28,9 +29,10 @@ async function CarsPageContent({
   const q = params.q ?? "";
   const status = params.status ?? "all";
   const businessModel = params.business_model ?? "all";
+  const inventory = params.inventory ?? "all";
   const sort = params.sort ?? "newest";
   const [cars, clients] = await Promise.all([
-    getCars({ q, status, business_model: businessModel, sort }),
+    getCars({ q, status, business_model: businessModel, inventory: inventory === "all" ? undefined : inventory as "active" | "sold", sort }),
     getClientOptions(),
   ]);
   const clientNames = Object.fromEntries(clients.map((client) => [client.id, client.full_name]));
@@ -45,6 +47,7 @@ async function CarsPageContent({
       initialQuery={q}
       initialStatus={status}
       initialBusinessModel={businessModel}
+      initialInventory={inventory}
       initialSort={sort}
     />
   );

@@ -441,7 +441,15 @@ export type ListLabelKey =
   | "client"
   | "salePrice"
   | "expectedCommission"
-  | "netProfit";
+  | "netProfit"
+  | "projectedProfit"
+  | "finalProfit"
+  | "totalExpenses"
+  | "actualSalePrice";
+
+function resolveProfitLabelKey(car: Car): "projectedProfit" | "finalProfit" {
+  return car.status === CAR_STATUS_SOLD ? "finalProfit" : "projectedProfit";
+}
 
 export function getListRowDisplay(
   car: Car,
@@ -470,7 +478,7 @@ export function getListRowDisplay(
       },
       primaryLabelKey: "purchasePrice",
       secondaryLabelKey: "salePrice",
-      profitLabelKey: "netProfit",
+      profitLabelKey: resolveProfitLabelKey(car),
     };
   }
 
@@ -493,7 +501,7 @@ export function getListRowDisplay(
       },
       primaryLabelKey: "ownerNetAmount",
       secondaryLabelKey: "expectedCommission",
-      profitLabelKey: "netProfit",
+      profitLabelKey: resolveProfitLabelKey(car),
     };
   }
 
@@ -512,7 +520,7 @@ export function getListRowDisplay(
     },
     primaryLabelKey: "client",
     secondaryLabelKey: "expectedCommission",
-    profitLabelKey: "netProfit",
+    profitLabelKey: resolveProfitLabelKey(car),
     ...(clientName ? { clientName } : {}),
   } as ListRowDisplay & { clientName?: string };
 }
@@ -538,8 +546,8 @@ export type FinanceSummaryLabelKey =
   | "sale"
   | "salePrice"
   | "actualSalePrice"
-  | "estimatedProfit"
-  | "actualProfit"
+  | "projectedProfit"
+  | "finalProfit"
   | "ownerNetAmount"
   | "remautoCommission"
   | "vehiclePrice"
@@ -594,7 +602,7 @@ export function getFinanceSummaryRows(
         amount: actualSale,
       },
       {
-        labelKey: profit.isEstimate ? "estimatedProfit" : "actualProfit",
+        labelKey: profit.isEstimate ? "projectedProfit" : "finalProfit",
         amount: profit.netProfit,
         isEstimate: profit.isEstimate,
         accent: true,
@@ -628,7 +636,7 @@ export function getFinanceSummaryRows(
       },
       { labelKey: "expenses", amount: totalExpenses },
       {
-        labelKey: "netProfit",
+        labelKey: resolveProfitLabelKey(car),
         amount: profit.netProfit,
         isEstimate: profit.isEstimate,
         accent: true,
@@ -650,7 +658,7 @@ export function getFinanceSummaryRows(
     },
     { labelKey: "expenses", amount: totalExpenses },
     {
-      labelKey: "netProfit",
+      labelKey: resolveProfitLabelKey(car),
       amount: profit.netProfit,
       isEstimate: profit.isEstimate,
       accent: true,

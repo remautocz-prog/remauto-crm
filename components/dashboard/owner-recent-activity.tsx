@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import type { DashboardActivityItem, DashboardActivityKind } from "@/lib/types/dashboard";
+import {
+  translateDocumentPriority,
+  translateDocumentStatus,
+} from "@/lib/i18n/documents";
+import { useFormatters } from "@/lib/hooks/use-formatters";
 import {
   Car,
   CreditCard,
@@ -16,13 +22,6 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
-import type { DashboardActivityItem, DashboardActivityKind } from "@/lib/types/dashboard";
-import {
-  translateDocumentPriority,
-  translateDocumentStatus,
-} from "@/lib/i18n/documents";
-import { DashboardSectionState } from "@/components/dashboard/dashboard-section-state";
-import { useFormatters } from "@/lib/hooks/use-formatters";
 
 const ACTIVITY_ICONS: Record<DashboardActivityKind, LucideIcon> = {
   client_created: UserPlus,
@@ -40,16 +39,17 @@ const ACTIVITY_ICONS: Record<DashboardActivityKind, LucideIcon> = {
   expense_added: Receipt,
 };
 
-type DashboardRecentActivityProps = {
+type OwnerRecentActivityProps = {
   items: DashboardActivityItem[];
   error?: string;
 };
 
-export function DashboardRecentActivitySection({
+export function OwnerRecentActivity({
   items,
   error,
-}: DashboardRecentActivityProps) {
+}: OwnerRecentActivityProps) {
   const t = useTranslations("dashboard");
+  const tOwner = useTranslations("dashboard.owner");
   const tStatus = useTranslations("documents.status");
   const tPriority = useTranslations("documents.priority");
   const tDetailingStatus = useTranslations("detailing.status");
@@ -97,75 +97,71 @@ export function DashboardRecentActivitySection({
       case "priority_changed":
         return translateDocumentPriority(tPriority, item.meta);
       case "payment_marked":
+      case "expense_added":
         return formatCurrency(Number(item.meta));
       case "detailing_status_changed":
         return item.meta ? tDetailingStatus(item.meta as never) : null;
-      case "expense_added":
-        return formatCurrency(Number(item.meta));
-      case "employee_assigned":
-        return item.meta;
       default:
         return item.meta;
     }
   }
 
   return (
-    <DashboardSectionState
-      title={t("recentActivity")}
-      error={error}
-      isEmpty={!error && items.length === 0}
-      emptyMessage={t("noRecentActivity")}
-    >
-      <ol className="relative space-y-0 border-l border-zinc-800 pl-4">
-        {items.map((item) => {
-          const Icon = ACTIVITY_ICONS[item.kind];
-          const actionLabel = getActionLabel(item);
-          const metaLabel = getMetaLabel(item);
+    <section className="space-y-3">
+      <h3 className="text-base font-semibold text-white">{tOwner("recentActivity")}</h3>
 
-          return (
-            <li key={item.id} className="relative pb-5 last:pb-0">
-              <article className="relative pl-3">
-                <span
-                  className="absolute -left-[1.35rem] top-1 flex h-6 w-6 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900"
-                  aria-hidden
-                >
-                  <Icon className="h-3.5 w-3.5 text-zinc-400" />
+      {error ? (
+        <p className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-4 py-3 text-sm text-amber-200">
+          {error}
+        </p>
+      ) : items.length === 0 ? (
+        <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500">
+          {tOwner("noActivity")}
+        </p>
+      ) : (
+        <ul className="divide-y divide-zinc-800 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/30">
+          {items.map((item) => {
+            const Icon = ACTIVITY_ICONS[item.kind];
+            const metaLabel = getMetaLabel(item);
+            const row = (
+              <div className="flex items-start gap-3 px-4 py-3">
+                <span className="mt-0.5 rounded-lg bg-zinc-800/80 p-2">
+                  <Icon className="h-3.5 w-3.5 text-zinc-400" aria-hidden />
                 </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-sm font-medium text-white">
+                      {getActionLabel(item)}
+                    </p>
+                    <time
+                      dateTime={item.occurredAt}
+                      className="shrink-0 text-xs text-zinc-500"
+                    >
+                      {formatDateTime(item.occurredAt)}
+                    </time>
+                  </div>
+                  <p className="truncate text-sm text-zinc-300">{item.entityName}</p>
+                  {metaLabel ? (
+                    <p className="text-xs tabular-nums text-zinc-500">{metaLabel}</p>
+                  ) : null}
+                </div>
+              </div>
+            );
 
-                <p className="text-sm font-medium text-white">{actionLabel}</p>
-                <p className="mt-0.5 truncate text-sm text-zinc-300">{item.entityName}</p>
-
-                {metaLabel && item.kind !== "note_added" ? (
-                  <p className="mt-0.5 text-xs text-zinc-500">{metaLabel}</p>
-                ) : null}
-
-                {item.preview ? (
-                  <p className="mt-0.5 truncate text-xs italic text-zinc-600">
-                    {item.preview}
-                  </p>
-                ) : null}
-
-                {item.employeeName ? (
-                  <p className="mt-0.5 text-xs text-zinc-500">{item.employeeName}</p>
-                ) : null}
-
-                <p className="mt-1 text-xs text-zinc-600">
-                  <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
-                </p>
-
+            return (
+              <li key={item.id}>
                 {item.href ? (
-                  <Link
-                    href={item.href}
-                    className="mt-2 inline-block text-xs font-medium text-red-400 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 rounded-sm"
-                  >
-                    {t("openRelatedRecord")}
+                  <Link href={item.href} className="block transition-colors hover:bg-zinc-800/40">
+                    {row}
                   </Link>
-                ) : null}
-              </article>
-            </li>
-          );
-        })}
-      </ol>
-    </DashboardSectionState>
+                ) : (
+                  row
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
