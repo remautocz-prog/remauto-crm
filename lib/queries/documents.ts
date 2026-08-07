@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireAuthenticatedAccess } from "@/lib/auth/access";
 import {
   ACTIVE_DOCUMENT_TASK_STATUSES,
   COMPLETED_DOCUMENT_TASK_STATUSES,
   TERMINAL_DOCUMENT_TASK_STATUSES,
 } from "@/lib/constants/documents";
+import { parseDocumentListSegment } from "@/lib/documents/list-segment";
 import {
   derivePaymentStatus,
   getDocumentFinanceSummary,
@@ -45,6 +47,7 @@ const TASK_SELECT = `
   clients:client_id ( id, full_name, company, phone, email, client_type ),
   cars:car_id ( id, brand, model, year, vin, registration_number, client_id ),
   assignee:assigned_to ( id, full_name ),
+  archiver:archived_by ( id, full_name ),
   document_task_services ( * )
 `;
 
@@ -150,11 +153,20 @@ export async function getDocumentTasks(
 ): Promise<DocumentTaskWithRelations[]> {
   const supabase = await createClient();
   let query = supabase.from("document_tasks").select(TASK_SELECT);
+  const segment = parseDocumentListSegment({
+    segment: params.segment,
+    archived: params.archived,
+  });
 
-  if (params.archived) {
+  if (segment === "archived") {
     query = query.not("archived_at", "is", null);
   } else {
     query = query.is("archived_at", null);
+    if (segment === "completed") {
+      query = query.in("status", [...COMPLETED_DOCUMENT_TASK_STATUSES]);
+    } else {
+      query = query.in("status", [...ACTIVE_DOCUMENT_TASK_STATUSES]);
+    }
   }
 
   if (params.status && params.status !== "all") {
@@ -219,6 +231,19 @@ export async function getDocumentTasks(
   }
 
   return sortTasks(tasks, params.sort);
+}
+
+export async function getDocumentTasksForList(
+  params: DocumentTasksListParams = {}
+): Promise<DocumentTaskWithRelations[]> {
+  const access = await requireAuthenticatedAccess();
+  const scoped: DocumentTasksListParams = { ...params };
+
+  if (access.role === "documents") {
+    scoped.assigned_to = access.userId;
+  }
+
+  return getDocumentTasks(scoped);
 }
 
 export async function getDocumentTaskById(id: number) {

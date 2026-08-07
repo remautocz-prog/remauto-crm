@@ -1,27 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import {
-  FINANCE_PERIOD_VALUES,
-  previousPeriodLabelKey,
-  type FinancePeriod,
-} from "@/lib/finance/period-comparison";
+import { previousPeriodLabelKey } from "@/lib/finance/period-comparison";
 import type { FinanceCenterData } from "@/lib/queries/finance-center";
+import { DateRangeSelector } from "@/components/shared/date-range-selector";
 import {
   ControlMetricCard,
   FinanceSectionWarning,
-  OperatingMetricCard,
   PrimaryKpiCard,
 } from "@/components/finance/finance-kpi-cards";
+import { BusinessDirectionCards } from "@/components/finance/business-direction-cards";
 import {
   FinanceDirectionChart,
   FinanceProfitTrendChart,
 } from "@/components/finance/finance-charts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFormatters } from "@/lib/hooks/use-formatters";
-import { cn } from "@/lib/utils";
 
 type FinanceCenterViewProps = {
   data: FinanceCenterData;
@@ -61,7 +56,9 @@ function TopProfitSourcesSection({
                   <p className="truncate text-xs text-zinc-500">
                     {row.direction === "cars"
                       ? t("directionCars")
-                      : t("directionDetailing")}
+                      : row.direction === "detailing"
+                        ? t("directionDetailing")
+                        : t("directionDocuments")}
                   </p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold tabular-nums text-white">
@@ -146,17 +143,14 @@ export function FinanceCenterView({ data }: FinanceCenterViewProps) {
   const tDetailingCat = useTranslations("detailing");
   const tCommon = useTranslations("common");
   const { formatCurrency, formatDate } = useFormatters();
-  const router = useRouter();
   const dash = tCommon("dash");
 
   const formatShortDate = (value: string) =>
     formatDate(value, dash).replace(/\s/g, " ").slice(0, 6);
 
-  const comparisonLabel = t(`comparedWith.${previousPeriodLabelKey(data.period)}` as never);
-
-  function setPeriod(period: FinancePeriod) {
-    router.push(`/finance?period=${period}`);
-  }
+  const comparisonLabel = t(
+    `comparedWith.${previousPeriodLabelKey(data.dateRange.preset)}` as never
+  );
 
   if (data.errors.core) {
     return (
@@ -180,41 +174,24 @@ export function FinanceCenterView({ data }: FinanceCenterViewProps) {
           <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
           <p className="mt-1 text-sm text-zinc-400">{t("unifiedDescription")}</p>
         </div>
-        <div
-          className="flex flex-wrap gap-2 rounded-xl border border-zinc-800 bg-zinc-950/60 p-1"
-          role="tablist"
-          aria-label={t("periodSelector")}
-        >
-          {FINANCE_PERIOD_VALUES.map((period) => (
-            <button
-              key={period}
-              type="button"
-              role="tab"
-              aria-selected={data.period === period}
-              onClick={() => setPeriod(period)}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm transition-colors",
-                data.period === period
-                  ? "bg-red-600/80 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white"
-              )}
-            >
-              {t(`period.${period}` as never)}
-            </button>
-          ))}
+        <div className="w-full lg:max-w-2xl">
+          <DateRangeSelector
+            from={data.dateRange.from}
+            to={data.dateRange.to}
+            preset={data.dateRange.preset}
+          />
         </div>
       </div>
 
-      <section className="space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-          {t("primaryIndicators")}
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <PrimaryKpiCard
-            label={t("realizedProfit")}
+            label={t("combinedRealizedResult")}
             value={formatCurrency(data.combinedRealized)}
             comparison={data.errors.comparisons ? null : data.comparisons.realizedProfit}
             comparisonLabel={comparisonLabel}
+            newResultLabel={t("newResult")}
+            noChangeLabel={t("noChange")}
             formatCurrency={formatCurrency}
             accent="green"
           />
@@ -225,55 +202,16 @@ export function FinanceCenterView({ data }: FinanceCenterViewProps) {
             formatCurrency={formatCurrency}
             accent="amber"
           />
-          <PrimaryKpiCard
-            label={t("carsRealizedProfit")}
-            value={formatCurrency(data.cars.realizedProfit)}
-            formatCurrency={formatCurrency}
-            accent="blue"
-          />
-          <PrimaryKpiCard
-            label={t("detailingNetResult")}
-            value={formatCurrency(data.detailing.netResult)}
-            comparison={data.errors.comparisons ? null : data.comparisons.detailingNetResult}
-            comparisonLabel={comparisonLabel}
-            formatCurrency={formatCurrency}
-            accent="cyan"
-          />
         </div>
-      </section>
 
-      <section className="space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-          {t("operatingIndicators")}
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <OperatingMetricCard
-            label={t("detailingRevenue")}
-            value={formatCurrency(data.detailing.revenue)}
-            comparison={data.errors.comparisons ? null : data.comparisons.detailingRevenue}
-            comparisonLabel={comparisonLabel}
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            {t("businessDirections")}
+          </h2>
+          <BusinessDirectionCards
+            directions={data.businessDirections}
             formatCurrency={formatCurrency}
-            accent="blue"
-          />
-          <OperatingMetricCard
-            label={t("detailingCommissions")}
-            value={formatCurrency(data.detailing.commissions)}
-            formatCurrency={formatCurrency}
-            accent="violet"
-          />
-          <OperatingMetricCard
-            label={t("detailingExpenses")}
-            value={formatCurrency(data.detailing.expenses)}
-            comparison={data.errors.comparisons ? null : data.comparisons.detailingExpenses}
-            comparisonLabel={comparisonLabel}
-            formatCurrency={formatCurrency}
-            accent="red"
-          />
-          <OperatingMetricCard
-            label={t("documentsInProgress")}
-            value={String(data.documentsWorkload.inProgress)}
-            formatCurrency={formatCurrency}
-            accent="cyan"
+            formatNumber={(value) => String(value)}
           />
         </div>
       </section>
@@ -322,7 +260,7 @@ export function FinanceCenterView({ data }: FinanceCenterViewProps) {
 
         <Card className="border-zinc-800 bg-zinc-900/60">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">{t("realizedResult")}</CardTitle>
+            <CardTitle className="text-base text-white">{t("resultByDirection")}</CardTitle>
           </CardHeader>
           <CardContent>
             {data.errors.charts ? (
@@ -348,14 +286,6 @@ export function FinanceCenterView({ data }: FinanceCenterViewProps) {
           tDetailingCat={tDetailingCat}
         />
       </div>
-
-      {data.documentsProfit != null ? (
-        <p className="text-xs text-zinc-500">
-          {t("documentsRealizedProfit")}: {formatCurrency(data.documentsProfit)}
-        </p>
-      ) : (
-        <p className="text-xs text-zinc-500">{t("documentsNoIncome")}</p>
-      )}
 
       <p className="text-xs text-zinc-500">
         {t("projectedProfitNote")}{" "}

@@ -1,3 +1,4 @@
+import type { DateRangePreset } from "@/lib/date-range/filter";
 import {
   getDashboardPeriodBounds,
   type DashboardPeriod,
@@ -54,10 +55,21 @@ export function getPreviousPeriodBounds(
   return { start, end };
 }
 
-export type PeriodComparison = {
-  previousValue: number;
-  changePercent: number;
-};
+export type PeriodComparison =
+  | {
+      kind: "percent";
+      previousValue: number;
+      changePercent: number;
+    }
+  | {
+      kind: "unchanged";
+      previousValue: number;
+      changePercent: 0;
+    }
+  | {
+      kind: "new_result";
+      previousValue: 0;
+    };
 
 export function buildPeriodComparison(
   currentValue: number,
@@ -68,17 +80,25 @@ export function buildPeriodComparison(
   }
 
   if (previousValue === 0) {
-    return null;
+    return { kind: "new_result", previousValue: 0 };
   }
 
   const changePercent =
     Math.round(((currentValue - previousValue) / Math.abs(previousValue)) * 1000) / 10;
 
-  return { previousValue, changePercent };
+  if (changePercent === 0) {
+    return { kind: "unchanged", previousValue, changePercent: 0 };
+  }
+
+  return { previousValue, changePercent, kind: "percent" };
 }
 
-export function previousPeriodLabelKey(period: FinancePeriod) {
-  if (period === "today") return "previousDay" as const;
-  if (period === "week") return "previousWeek" as const;
-  return "previousMonth" as const;
+export function previousPeriodLabelKey(
+  period: FinancePeriod | DateRangePreset
+): "previousDay" | "previousWeek" | "previousMonth" | "previousYear" | "previousPeriod" {
+  if (period === "today") return "previousDay";
+  if (period === "week") return "previousWeek";
+  if (period === "year") return "previousYear";
+  if (period === "custom") return "previousPeriod";
+  return "previousMonth";
 }

@@ -1,27 +1,42 @@
 import {
   buildProfitDirectionBars,
   buildProfitTrendSeries,
-  computeCombinedMonthlyProfit,
 } from "@/lib/dashboard/owner-chart-metrics";
 import { buildOwnerActivityFeed } from "@/lib/dashboard/owner-activity-feed";
 import {
-  computeOwnerAttentionItems,
   computeOwnerTopCards,
   isTaskActiveForDeadline,
   isTaskDueToday,
   sortOverdueTasks,
 } from "@/lib/dashboard/owner-metrics";
+import {
+  getPreviousComparableRange,
+  parseDateRangeSearchParams,
+  type ResolvedDateRange,
+} from "@/lib/date-range/filter";
 import { EMPTY_DETAILING_DASHBOARD_STATS } from "@/lib/detailing/defaults";
-import { hydrateDetailingOrdersWithServices } from "@/lib/detailing/order-services-loader";
-import { DETAILING_ORDER_SELECT } from "@/lib/detailing/order-services-loader";
+import {
+  DETAILING_ORDER_SELECT,
+  hydrateDetailingOrdersWithServices,
+} from "@/lib/detailing/order-services-loader";
 import { safeDetailingQuery } from "@/lib/detailing/query-utils";
+import {
+  buildBusinessDirectionComparisons,
+  computeBusinessDirectionsCombinedResult,
+  EMPTY_BUSINESS_DIRECTIONS,
+  loadBusinessDirectionsForPeriod,
+  type BusinessDirectionComparisons,
+} from "@/lib/finance/finance-center-directions";
+import { getDocumentsFinanceSummary } from "@/lib/finance/documents-summary";
 import {
   getDetailingAttentionOrders,
   getDetailingDashboardStats,
-  getTodayDetailingAppointments,
   getRecentDetailingOrders,
+  getTodayDetailingAppointments,
   mapDetailingOrder,
 } from "@/lib/queries/detailing";
+import { loadOwnerAttentionData } from "@/lib/queries/owner-attention";
+import { getCurrentUserAccess, hasPermission, requirePermission } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import {
   mapDocumentTask,
@@ -50,29 +65,45 @@ function mapTaskRow(row: Record<string, unknown>): DocumentTaskWithRelations {
   return mergeTaskRelations(mapDocumentTask(row), row);
 }
 
-function addDays(date: string, days: number) {
-  const [year, month, day] = date.split("-").map(Number);
-  const next = new Date(Date.UTC(year, month - 1, day));
-  next.setUTCDate(next.getUTCDate() + days);
-  return next.toISOString().slice(0, 10);
+function resolveDashboardPeriod(dateRange: ResolvedDateRange): DashboardPeriod {
+  if (dateRange.preset === "custom") return "month";
+  return dateRange.preset;
 }
 
-function emptyOwnerDashboard(period: DashboardPeriod): OwnerDashboardData {
+function emptyOwnerDashboard(dateRange: ResolvedDateRange): OwnerDashboardData {
   return {
-    period,
+    dateRange,
+    period: resolveDashboardPeriod(dateRange),
     topCards: {
       monthlyProfit: 0,
+      documentsProfit: 0,
       carsInStock: 0,
       commissionCarsInStock: 0,
       documentsInProgress: 0,
       detailingOrdersToday: 0,
       attentionCount: 0,
     },
+    businessDirections: EMPTY_BUSINESS_DIRECTIONS,
+    businessDirectionComparisons: {
+      cars: null,
+      detailing: null,
+      documents: null,
+    },
+    attention: {
+      items: [],
+      summary: { critical: 0, high: 0, total: 0 },
+      errors: {},
+    },
+    attentionQuickActions: {
+      documentsStatus: false,
+      detailingPayment: false,
+      detailingStatus: false,
+      carsStatus: false,
+    },
     charts: {
       profitTrend: [],
       profitByDirection: [],
     },
-    attentionItems: [],
     today: {
       detailingAppointments: [],
       detailingReady: [],
@@ -87,14 +118,41 @@ function emptyOwnerDashboard(period: DashboardPeriod): OwnerDashboardData {
   };
 }
 
-export async function getOwnerDashboardData(
-  period: DashboardPeriod = "month"
-): Promise<OwnerDashboardData> {
+export async function getOwnerDashboardData(input?: {
+  from?: string | null;
+  to?: string | null;
+  preset?: string | null;
+  period?: string | null;
+}): Promise<OwnerDashboardData> {
+  await requirePermission("owner.dashboard");
+  const dateRange = parseDateRangeSearchParams(input ?? {});
+  const bounds = dateRange.bounds;
   const supabase = await createClient();
   const today = getPragueTodayDateString();
-  const trendStart = addDays(today, -29);
+  const trendStart = bounds.start ?? dateRange.from;
+  const trendEnd = bounds.end ?? dateRange.to;
   const errors: OwnerDashboardSectionErrors = {};
   const detailingWarnings: { query: string; message: string }[] = [];
+
+  const [userAccess, attention] = await Promise.all([
+    getCurrentUserAccess(),
+    loadOwnerAttentionData(),
+  ]);
+
+  const attentionQuickActions = {
+    documentsStatus: userAccess
+      ? hasPermission(userAccess.role, "documents.update")
+      : false,
+    detailingPayment: userAccess
+      ? hasPermission(userAccess.role, "detailing.payment.update")
+      : false,
+    detailingStatus: userAccess
+      ? hasPermission(userAccess.role, "detailing.update")
+      : false,
+    carsStatus: false,
+  };
+
+  const attentionCount = attention.summary.total;
 
   const [
     documentsResult,
@@ -125,12 +183,13 @@ export async function getOwnerDashboardData(
       .select(DETAILING_ORDER_SELECT)
       .eq("status", "delivered")
       .gte("actual_completion_at", `${trendStart}T00:00:00.000Z`)
+      .lte("actual_completion_at", `${trendEnd}T23:59:59.999Z`)
       .is("archived_at", null),
     supabase
       .from("detailing_expenses")
       .select("amount, expense_date")
       .gte("expense_date", trendStart)
-      .lte("expense_date", today),
+      .lte("expense_date", trendEnd),
   ]);
 
   let tasks: DocumentTaskWithRelations[] = [];
@@ -290,47 +349,70 @@ export async function getOwnerDashboardData(
     errors.detailing = true;
   }
 
-  const attentionItems =
-    errors.cars && errors.documents && errors.detailing
-      ? []
-      : computeOwnerAttentionItems({
-          cars: errors.cars ? [] : cars,
-          tasks: errors.documents ? [] : tasks,
-          detailingOrders: errors.detailing
-            ? []
-            : [...detailingAttentionOrders, ...recentDetailingOrders],
-          today,
-        });
+  let businessDirections = EMPTY_BUSINESS_DIRECTIONS;
+  let businessDirectionComparisons: BusinessDirectionComparisons = {
+    cars: null,
+    detailing: null,
+    documents: null,
+  };
+  let periodDetailingNet = 0;
 
-  const attentionCount = attentionItems.reduce(
-    (sum, item) => sum + item.count,
-    0
-  );
+  if (bounds.start && bounds.end && !errors.cars && !errors.documents) {
+    try {
+      businessDirections = await loadBusinessDirectionsForPeriod({
+        bounds,
+        cars,
+        expensesByCar,
+        tasks,
+      });
+      periodDetailingNet = businessDirections.detailing.netResult;
 
-  const monthlyProfit =
-    errors.cars || errors.documents || errors.detailing
-      ? 0
-      : computeCombinedMonthlyProfit({
+      const previousRange = getPreviousComparableRange(dateRange);
+      if (previousRange) {
+        const previousDirections = await loadBusinessDirectionsForPeriod({
+          bounds: { start: previousRange.from, end: previousRange.to },
           cars,
           expensesByCar,
-          detailingNet: detailingStats.monthNetResult,
-          documentTasks: tasks,
-          today,
+          tasks,
         });
+        businessDirectionComparisons = buildBusinessDirectionComparisons({
+          current: businessDirections,
+          previous: previousDirections,
+        });
+      }
+    } catch {
+      errors.detailing = true;
+      businessDirections = EMPTY_BUSINESS_DIRECTIONS;
+    }
+  } else if (errors.detailing) {
+    businessDirections = EMPTY_BUSINESS_DIRECTIONS;
+  }
+
+  const monthlyProfit =
+    errors.cars || errors.documents || !bounds.start || !bounds.end
+      ? 0
+      : computeBusinessDirectionsCombinedResult(businessDirections);
+
+  const documentsProfit =
+    errors.documents || !bounds.start || !bounds.end
+      ? 0
+      : getDocumentsFinanceSummary({ tasks, bounds }).profit;
 
   const topCards = computeOwnerTopCards({
     monthlyProfit,
+    documentsProfit,
     cars: errors.cars ? [] : cars,
     tasks: errors.documents ? [] : tasks,
     detailingOrdersToday: detailingStats.todayAppointments,
     attentionCount,
   });
 
-  let charts = emptyOwnerDashboard(period).charts;
-  if (!errors.charts && !errors.cars && !errors.documents) {
+  let charts = emptyOwnerDashboard(dateRange).charts;
+  if (!errors.charts && !errors.cars && !errors.documents && bounds.start && bounds.end) {
     charts = {
       profitTrend: buildProfitTrendSeries({
-        today,
+        rangeStart: trendStart,
+        rangeEnd: trendEnd,
         cars,
         expensesByCar,
         detailingOrders: chartDetailingOrders,
@@ -338,10 +420,10 @@ export async function getOwnerDashboardData(
         documentTasks: tasks,
       }),
       profitByDirection: buildProfitDirectionBars({
-        today,
+        bounds,
         cars,
         expensesByCar,
-        detailingNet: errors.detailing ? 0 : detailingStats.monthNetResult,
+        detailingNet: errors.detailing ? 0 : periodDetailingNet,
         documentTasks: tasks,
       }),
     };
@@ -379,6 +461,7 @@ export async function getOwnerDashboardData(
       notes,
       detailingOrders: recentDetailingOrders,
       carExpenses: carExpensesRecent,
+      bounds,
       limit: 8,
     });
   } else if (errors.cars || errors.documents || errors.clients) {
@@ -386,10 +469,14 @@ export async function getOwnerDashboardData(
   }
 
   return {
-    period,
+    dateRange,
+    period: resolveDashboardPeriod(dateRange),
     topCards,
+    businessDirections,
+    businessDirectionComparisons,
+    attention,
+    attentionQuickActions,
     charts,
-    attentionItems,
     today: {
       detailingAppointments: todayDetailingAppointments.slice(0, 5),
       detailingReady,

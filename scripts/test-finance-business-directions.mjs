@@ -1,0 +1,256 @@
+import assert from "node:assert/strict";
+
+const COMPLETED = ["COMPLETED", "DELIVERED"];
+
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function isWithinPeriod(date, { start, end }) {
+  return date >= start && date <= end;
+}
+
+function documentsSummary(tasks, bounds) {
+  let revenue = 0;
+  let expenses = 0;
+  let paidRevenue = 0;
+  let completedCount = 0;
+
+  for (const task of tasks) {
+    if (task.archived_at) continue;
+    if (!COMPLETED.includes(task.status)) continue;
+    const completedAt = task.completed_at?.slice(0, 10);
+    if (!completedAt || !isWithinPeriod(completedAt, bounds)) continue;
+    const servicePrice = Number(task.service_price ?? 0);
+    const costPrice = Number(task.cost_price ?? 0);
+    if (!(servicePrice > 0 || costPrice > 0)) continue;
+
+    revenue += servicePrice;
+    expenses += costPrice;
+    paidRevenue += Math.min(Number(task.paid_amount ?? 0), servicePrice);
+    completedCount += 1;
+  }
+
+  const profit = roundMoney(revenue - expenses);
+  return {
+    revenue: roundMoney(revenue),
+    expenses: roundMoney(expenses),
+    profit,
+    paidRevenue: roundMoney(paidRevenue),
+    unpaidRevenue: roundMoney(Math.max(revenue - paidRevenue, 0)),
+    completedCount,
+  };
+}
+
+function detailingSummary(orders, expenseTotal) {
+  const delivered = orders.filter((o) => o.status === "delivered");
+  const revenue = roundMoney(delivered.reduce((s, o) => s + o.final_price, 0));
+  const commissions = roundMoney(
+    delivered.reduce((s, o) => s + (o.commission_total ?? 0), 0)
+  );
+  const expenses = roundMoney(expenseTotal);
+  return {
+    orderCount: delivered.length,
+    revenue,
+    commissions,
+    expenses,
+    netResult: roundMoney(revenue - commissions - expenses),
+  };
+}
+
+function buildCards({ carsProfit, carsExpenses, soldCount, detailing, documents }) {
+  return {
+    cars: { profit: carsProfit, expenses: carsExpenses, soldCount },
+    detailing,
+    documents,
+  };
+}
+
+function combinedResult(cards) {
+  return roundMoney(
+    cards.cars.profit + cards.detailing.netResult + cards.documents.profit
+  );
+}
+
+function chartSummary(cards) {
+  return [
+    { id: "cars", profit: cards.cars.profit },
+    { id: "detailing", profit: cards.detailing.netResult },
+    { id: "documents", profit: cards.documents.profit },
+  ];
+}
+
+const bounds = { start: "2026-03-01", end: "2026-03-31" };
+let passed = 0;
+
+function check(label, condition) {
+  assert.ok(condition, label);
+  passed += 1;
+}
+
+// Cars only
+{
+  const cards = buildCards({
+    carsProfit: 120000,
+    carsExpenses: 45000,
+    soldCount: 2,
+    detailing: detailingSummary([], 0),
+    documents: documentsSummary([], bounds),
+  });
+  check("cars only combined", combinedResult(cards) === 120000);
+  check("cars only chart has 3 bars", chartSummary(cards).length === 3);
+}
+
+// Detailing only
+{
+  const detailing = detailingSummary(
+    [{ status: "delivered", final_price: 8000, commission_total: 1200 }],
+    500
+  );
+  const cards = buildCards({
+    carsProfit: 0,
+    carsExpenses: 0,
+    soldCount: 0,
+    detailing,
+    documents: documentsSummary([], bounds),
+  });
+  check("detailing only net", cards.detailing.netResult === 6300);
+  check("detailing only combined", combinedResult(cards) === 6300);
+}
+
+// Documents only
+{
+  const docs = documentsSummary(
+    [
+      {
+        status: "COMPLETED",
+        completed_at: "2026-03-10",
+        service_price: 3000,
+        cost_price: 800,
+        paid_amount: 3000,
+      },
+    ],
+    bounds
+  );
+  const cards = buildCards({
+    carsProfit: 0,
+    carsExpenses: 0,
+    soldCount: 0,
+    detailing: detailingSummary([], 0),
+    documents: docs,
+  });
+  check("documents only profit", cards.documents.profit === 2200);
+  check("documents only combined", combinedResult(cards) === 2200);
+}
+
+// All three
+{
+  const cards = buildCards({
+    carsProfit: 50000,
+    carsExpenses: 10000,
+    soldCount: 1,
+    detailing: detailingSummary(
+      [{ status: "delivered", final_price: 10000, commission_total: 1500 }],
+      1000
+    ),
+    documents: documentsSummary(
+      [
+        {
+          status: "DELIVERED",
+          completed_at: "2026-03-20",
+          service_price: 4000,
+          cost_price: 1000,
+          paid_amount: 2000,
+        },
+      ],
+      bounds
+    ),
+  });
+  check("all three combined", combinedResult(cards) === 50000 + 7500 + 3000);
+  check(
+    "chart matches cards",
+    chartSummary(cards).every(
+      (bar, i) =>
+        bar.profit ===
+        [cards.cars.profit, cards.detailing.netResult, cards.documents.profit][i]
+    )
+  );
+}
+
+// Negative documents profit
+{
+  const docs = documentsSummary(
+    [
+      {
+        status: "COMPLETED",
+        completed_at: "2026-03-05",
+        service_price: 1000,
+        cost_price: 2500,
+        paid_amount: 1000,
+      },
+    ],
+    bounds
+  );
+  check("negative documents profit", docs.profit === -1500);
+}
+
+// Unpaid completed documents
+{
+  const docs = documentsSummary(
+    [
+      {
+        status: "COMPLETED",
+        completed_at: "2026-03-12",
+        service_price: 6000,
+        cost_price: 500,
+        paid_amount: 0,
+      },
+    ],
+    bounds
+  );
+  check("unpaid completed recognized", docs.completedCount === 1);
+  check("unpaid revenue split", docs.unpaidRevenue === 6000 && docs.paidRevenue === 0);
+}
+
+// Custom date range
+{
+  const customBounds = { start: "2026-01-15", end: "2026-01-20" };
+  const docs = documentsSummary(
+    [
+      {
+        status: "COMPLETED",
+        completed_at: "2026-01-18",
+        service_price: 2000,
+        cost_price: 200,
+        paid_amount: 2000,
+      },
+      {
+        status: "COMPLETED",
+        completed_at: "2026-02-01",
+        service_price: 9000,
+        cost_price: 100,
+        paid_amount: 9000,
+      },
+    ],
+    customBounds
+  );
+  check("custom range filters tasks", docs.completedCount === 1 && docs.revenue === 2000);
+}
+
+// Empty period
+{
+  const cards = buildCards({
+    carsProfit: 0,
+    carsExpenses: 0,
+    soldCount: 0,
+    detailing: detailingSummary([], 0),
+    documents: documentsSummary([], bounds),
+  });
+  check("empty period combined zero", combinedResult(cards) === 0);
+  check(
+    "empty period chart still three",
+    chartSummary(cards).every((bar) => bar.profit === 0)
+  );
+}
+
+console.log(`finance business directions: ${passed} assertions passed`);

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newEntityUuid } from "@/lib/supabase/safe-insert";
 import { getTranslations } from "next-intl/server";
 import {
   buildServiceCommissionSnapshot,
@@ -34,6 +35,14 @@ import type {
   DetailingPaymentStatus,
 } from "@/lib/constants/detailing";
 import type { DetailingOrderFormInput, DetailingOrderServiceInput, DetailingServiceFormInput } from "@/lib/types/detailing";
+import type { UserAccess } from "@/lib/auth/types";
+import {
+  guardAuthenticated,
+  guardPermission,
+  getPermissionDeniedMessage,
+} from "@/lib/auth/action-guard";
+import { hasPermission } from "@/lib/auth/permissions";
+import { isOrderRelevantToEmployee } from "@/lib/detailing/employee-dashboard";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
 
 function revalidateDetailingPaths(orderId?: string) {
@@ -185,6 +194,8 @@ async function translateValidationIssue(code: string) {
 export async function createDetailingOrderAction(
   input: DetailingOrderFormInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await guardPermission<{ id: string }>("detailing.create");
+  if (denied) return denied;
   const issues = collectDetailingOrderValidationIssues(input);
   if (issues.length) {
     return { success: false, error: await translateValidationIssue(issues[0]) };
@@ -192,6 +203,16 @@ export async function createDetailingOrderAction(
 
   try {
     const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user?.id) {
+      const t = await getTranslations("detailing.payment");
+      return { success: false, error: t("notAuthenticated") };
+    }
+
+    const orderId = newEntityUuid();
     const orderNumber = await allocateDetailingOrderNumber();
     const financials = await buildOrderFinancials(input, input.status);
 
@@ -200,9 +221,10 @@ export async function createDetailingOrderAction(
         ? input.actual_completion_at ?? new Date().toISOString()
         : input.actual_completion_at ?? null;
 
-    const { data: order, error: orderError } = await supabase
+    const { error: orderError } = await supabase
       .from("detailing_orders")
       .insert({
+        id: orderId,
         order_number: orderNumber,
         customer_first_name: input.customer_first_name?.trim() || null,
         customer_last_name: input.customer_last_name?.trim() || null,
@@ -231,16 +253,15 @@ export async function createDetailingOrderAction(
         paid_amount: financials.paid_amount,
         remaining_amount: financials.remaining_amount,
         payment_status: financials.payment_status,
-      })
-      .select("id")
-      .single();
+        created_by: user.id,
+      });
 
     if (orderError) {
       return { success: false, error: await formatSupabaseError(orderError) };
     }
 
     const serviceRows = await buildServiceRowsWithCommissions(
-      String(order.id),
+      orderId,
       input.services,
       input.status
     );
@@ -253,8 +274,8 @@ export async function createDetailingOrderAction(
       return { success: false, error: await formatSupabaseError(servicesError) };
     }
 
-    revalidateDetailingPaths(String(order.id));
-    return { success: true, data: { id: String(order.id) } };
+    revalidateDetailingPaths(orderId);
+    return { success: true, data: { id: orderId } };
   } catch (error) {
     return {
       success: false,
@@ -267,6 +288,8 @@ export async function updateDetailingOrderAction(
   orderId: string,
   input: DetailingOrderFormInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("detailing.update");
+  if (denied) return denied;
   const issues = collectDetailingOrderValidationIssues(input);
   if (issues.length) {
     return { success: false, error: await translateValidationIssue(issues[0]) };
@@ -384,6 +407,22 @@ export async function updateDetailingPaymentStatusAction(
     warning?: string;
   }>
 > {
+  const access = await guardAuthenticated();
+  if ("success" in access && access.success === false) {
+    return access;
+  }
+  const userAccess = access as UserAccess;
+
+  const canManageFinance = hasPermission(userAccess.role, "finance.manage");
+  const canUpdateDetailingPayment = hasPermission(
+    userAccess.role,
+    "detailing.payment.update"
+  );
+
+  if (!canManageFinance && !canUpdateDetailingPayment) {
+    return { success: false, error: await getPermissionDeniedMessage() };
+  }
+
   if (paymentStatus !== "paid" && paymentStatus !== "unpaid") {
     const t = await getTranslations("detailing.payment");
     return { success: false, error: t("invalidStatus") };
@@ -404,6 +443,13 @@ export async function updateDetailingPaymentStatusAction(
     if (!existing) {
       const t = await getTranslations("detailing");
       return { success: false, error: t("orderNotFound") };
+    }
+
+    if (
+      !canManageFinance &&
+      !isOrderRelevantToEmployee(existing, userAccess.userId)
+    ) {
+      return { success: false, error: await getPermissionDeniedMessage() };
     }
 
     if (existing.final_price < 0) {
@@ -454,6 +500,8 @@ export async function changeDetailingOrderStatusAction(
   status: DetailingOrderStatus,
   options?: { confirmNoEmployee?: boolean }
 ): Promise<ActionResult<{ status: DetailingOrderStatus }>> {
+  const denied = await guardPermission<{ status: DetailingOrderStatus }>("detailing.update");
+  if (denied) return denied;
   try {
     const existing = await getDetailingOrderById(orderId);
     if (!existing) {
@@ -513,6 +561,8 @@ export async function upsertDetailingEmployeeAction(input: {
   commission_percent: number;
   display_name?: string | null;
 }): Promise<ActionResult> {
+  const denied = await guardPermission("users.update");
+  if (denied) return denied;
   try {
     const supabase = await createClient();
     const { error } = await supabase.from("detailing_employee_settings").upsert(
@@ -546,24 +596,29 @@ export async function createDetailingExpenseAction(input: {
   amount: number;
   payment_method?: DetailingPaymentMethod | null;
 }): Promise<ActionResult<{ id: string }>> {
+  const denied = await guardPermission<{ id: string }>("detailing.expenses.manage");
+  if (denied) return denied;
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { data, error } = await supabase
-      .from("detailing_expenses")
-      .insert({
-        expense_date: input.expense_date,
-        category: input.category,
-        description: input.description.trim(),
-        amount: roundMoney(Math.max(input.amount, 0)),
-        payment_method: input.payment_method ?? null,
-        created_by: user?.id ?? null,
-      })
-      .select("id")
-      .single();
+    if (!user?.id) {
+      const t = await getTranslations("detailing.payment");
+      return { success: false, error: t("notAuthenticated") };
+    }
+
+    const expenseId = newEntityUuid();
+    const { error } = await supabase.from("detailing_expenses").insert({
+      id: expenseId,
+      expense_date: input.expense_date,
+      category: input.category,
+      description: input.description.trim(),
+      amount: roundMoney(Math.max(input.amount, 0)),
+      payment_method: input.payment_method ?? null,
+      created_by: user.id,
+    });
 
     if (error) {
       return { success: false, error: await formatSupabaseError(error) };
@@ -572,7 +627,7 @@ export async function createDetailingExpenseAction(input: {
     revalidatePath("/detailing/expenses");
     revalidatePath("/detailing/finance");
     revalidatePath("/detailing");
-    return { success: true, data: { id: String(data.id) } };
+    return { success: true, data: { id: expenseId } };
   } catch (error) {
     return {
       success: false,
@@ -589,6 +644,8 @@ export async function updateDetailingExpenseAction(input: {
   amount: number;
   payment_method?: DetailingPaymentMethod | null;
 }): Promise<ActionResult> {
+  const denied = await guardPermission("detailing.expenses.manage");
+  if (denied) return denied;
   try {
     const supabase = await createClient();
     const { error } = await supabase
@@ -621,6 +678,8 @@ export async function updateDetailingExpenseAction(input: {
 export async function saveDetailingServiceAction(
   input: DetailingServiceFormInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await guardPermission<{ id: string }>("settings.manage");
+  if (denied) return denied;
   try {
     const supabase = await createClient();
     const payload = {
@@ -649,17 +708,17 @@ export async function saveDetailingServiceAction(
       return { success: true, data: { id: input.id } };
     }
 
-    const { data, error } = await supabase
-      .from("detailing_services")
-      .insert(payload)
-      .select("id")
-      .single();
+    const serviceId = newEntityUuid();
+    const { error } = await supabase.from("detailing_services").insert({
+      id: serviceId,
+      ...payload,
+    });
     if (error) {
       return { success: false, error: await formatSupabaseError(error) };
     }
 
     revalidatePath("/detailing/services");
-    return { success: true, data: { id: String(data.id) } };
+    return { success: true, data: { id: serviceId } };
   } catch (error) {
     return {
       success: false,
@@ -672,6 +731,8 @@ export async function updateDetailingServiceAction(input: {
   id: string;
   active: boolean;
 }): Promise<ActionResult> {
+  const denied = await guardPermission("settings.manage");
+  if (denied) return denied;
   try {
     const supabase = await createClient();
     const { error } = await supabase
@@ -698,6 +759,8 @@ export async function buildServiceLineFromCatalogue(
   localeName: string,
   quantity = 1
 ) {
+  const denied = await guardPermission("detailing.view");
+  if (denied) return null;
   const service = await getDetailingServiceById(serviceId);
   if (!service) return null;
 

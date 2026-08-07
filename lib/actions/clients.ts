@@ -14,8 +14,16 @@ import {
   getAllClientsForDuplicateCheck,
 } from "@/lib/queries/clients";
 import { createClient } from "@/lib/supabase/server";
+import { insertIdentityReturningId } from "@/lib/supabase/safe-insert";
 import type { ClientDuplicateMatch, ClientFormInput } from "@/lib/types/clients";
+import { guardPermission } from "@/lib/auth/action-guard";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
+
+async function guardClientCreateOrUpdate<T>(): Promise<ActionResult<T> | null> {
+  const deniedCreate = await guardPermission<T>("clients.create");
+  if (!deniedCreate) return null;
+  return guardPermission<T>("clients.update");
+}
 
 async function mapValidationIssuesToFieldErrors(
   issues: ReturnType<typeof collectClientValidationIssues>
@@ -42,6 +50,8 @@ export async function checkClientDuplicatesAction(
   input: ClientFormInput,
   excludeId?: number
 ): Promise<ActionResult<{ duplicates: ClientDuplicateMatch[] }>> {
+  const denied = await guardClientCreateOrUpdate<{ duplicates: ClientDuplicateMatch[] }>();
+  if (denied) return denied;
   const existingClients = await getAllClientsForDuplicateCheck(excludeId);
   const duplicates = findClientDuplicates(input, existingClients, excludeId);
   return { success: true, data: { duplicates } };
@@ -51,6 +61,8 @@ export async function createClientAction(
   input: ClientFormInput,
   options?: { ignoreDuplicates?: boolean }
 ): Promise<ActionResult<{ id: number; duplicates?: ClientDuplicateMatch[] }>> {
+  const denied = await guardPermission<{ id: number; duplicates?: ClientDuplicateMatch[] }>("clients.create");
+  if (denied) return denied;
   const fieldErrors = await mapValidationIssuesToFieldErrors(
     collectClientValidationIssues(input)
   );
@@ -71,11 +83,11 @@ export async function createClientAction(
 
   const payload = normalizeClientPayload(input);
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("clients")
-    .insert(payload as Record<string, unknown>)
-    .select("id")
-    .single();
+  const { id, error } = await insertIdentityReturningId(
+    supabase,
+    "clients",
+    payload as Record<string, unknown>
+  );
 
   if (error) {
     console.error("[createClientAction] Supabase insert failed:", error, payload);
@@ -87,7 +99,7 @@ export async function createClientAction(
   revalidatePath("/reports");
   return {
     success: true,
-    data: { id: data.id, duplicates: duplicates.length ? duplicates : undefined },
+    data: { id, duplicates: duplicates.length ? duplicates : undefined },
   };
 }
 
@@ -96,6 +108,8 @@ export async function updateClientAction(
   input: ClientFormInput,
   options?: { ignoreDuplicates?: boolean }
 ): Promise<ActionResult> {
+  const denied = await guardPermission("clients.update");
+  if (denied) return denied;
   const fieldErrors = await mapValidationIssuesToFieldErrors(
     collectClientValidationIssues(input)
   );
@@ -134,6 +148,8 @@ export async function updateClientAction(
 }
 
 export async function archiveClientAction(id: number): Promise<ActionResult> {
+  const denied = await guardPermission("clients.archive");
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("clients")
@@ -153,6 +169,8 @@ export async function archiveClientAction(id: number): Promise<ActionResult> {
 }
 
 export async function unarchiveClientAction(id: number): Promise<ActionResult> {
+  const denied = await guardPermission("clients.archive");
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("clients")
@@ -174,6 +192,8 @@ export async function linkCarToClientAction(
   clientId: number,
   carId: number
 ): Promise<ActionResult> {
+  const denied = await guardPermission("clients.update");
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("cars")

@@ -1,34 +1,42 @@
 import {
-  buildProfitDirectionBars,
   buildProfitTrendSeries,
 } from "@/lib/dashboard/owner-chart-metrics";
-import {
-  getDashboardPeriodBounds,
-  type DashboardPeriodBounds,
-} from "@/lib/dashboard/period";
+import type { DashboardPeriodBounds } from "@/lib/dashboard/period";
 import {
   computeCombinedRealizedResult,
-  computeDocumentsRealizedProfit,
+  getDocumentsFinanceSummary,
+  type DocumentsFinanceSummary,
 } from "@/lib/finance/combined-summary";
 import {
   buildExpensesByCar,
   computeCarsFinanceSummary,
 } from "@/lib/finance/cars-summary";
+import { mapDetailingFinanceReportToSummary } from "@/lib/finance/detailing-summary";
+import {
+  buildFinanceBusinessDirectionCards,
+  buildFinanceDirectionChartSummary,
+  computeCarsRealizedExpensesInPeriod,
+  type FinanceBusinessDirectionCards,
+} from "@/lib/finance/finance-center-directions";
 import {
   buildExpenseBreakdown,
   buildTopProfitSources,
-  simplifyFinanceDirectionBars,
   type FinanceDirectionSummary,
   type FinanceExpenseBreakdownRow,
   type FinanceTopSourceRow,
 } from "@/lib/finance/finance-center-insights";
 import {
   buildPeriodComparison,
-  getPreviousPeriodBounds,
   parseFinanceCenterPeriod,
   type FinancePeriod,
   type PeriodComparison,
 } from "@/lib/finance/period-comparison";
+import {
+  getPreviousComparableRange,
+  parseDateRangeSearchParams,
+  type DateRangeFilter,
+  type ResolvedDateRange,
+} from "@/lib/date-range/filter";
 import { computeDocumentWorkloadSummary } from "@/lib/documents/summary";
 import { getPragueTodayDateString } from "@/lib/documents/deadline";
 import { hydrateDetailingOrdersWithServices } from "@/lib/detailing/order-services-loader";
@@ -50,6 +58,7 @@ export type FinanceComparisonMetrics = {
   detailingRevenue: PeriodComparison | null;
   detailingExpenses: PeriodComparison | null;
   detailingNetResult: PeriodComparison | null;
+  documentsProfit: PeriodComparison | null;
 };
 
 export type FinanceCenterSectionErrors = {
@@ -61,12 +70,14 @@ export type FinanceCenterSectionErrors = {
 };
 
 export type FinanceCenterData = {
+  dateRange: ResolvedDateRange;
   period: FinancePeriod;
   bounds: DashboardPeriodBounds;
   cars: CarsFinanceSummary;
   detailing: DetailingFinanceSummary;
   documentsWorkload: DocumentWorkloadSummary;
-  documentsProfit: number | null;
+  documents: DocumentsFinanceSummary;
+  businessDirections: FinanceBusinessDirectionCards;
   combinedRealized: number;
   comparisons: FinanceComparisonMetrics;
   profitTrend: ProfitTrendPoint[];
@@ -96,11 +107,28 @@ const EMPTY_DETAILING: DetailingFinanceSummary = {
   netResult: 0,
 };
 
+const EMPTY_DOCUMENTS: DocumentsFinanceSummary = {
+  revenue: 0,
+  expenses: 0,
+  profit: 0,
+  paidRevenue: 0,
+  unpaidRevenue: 0,
+  completedCount: 0,
+  averageOrderValue: 0,
+  profitSupported: true,
+};
+
 const EMPTY_WORKLOAD: DocumentWorkloadSummary = {
   inProgress: 0,
   dueToday: 0,
   overdue: 0,
   completedThisPeriod: 0,
+};
+
+const EMPTY_BUSINESS_DIRECTIONS: FinanceBusinessDirectionCards = {
+  cars: { profit: 0, expenses: 0, soldCount: 0 },
+  detailing: EMPTY_DETAILING,
+  documents: EMPTY_DOCUMENTS,
 };
 
 function mapTaskRow(row: Record<string, unknown>): DocumentTaskWithRelations {
@@ -114,23 +142,30 @@ function addDays(date: string, days: number) {
   return next.toISOString().slice(0, 10);
 }
 
-function emptyFinanceCenter(period: FinancePeriod, bounds: DashboardPeriodBounds): FinanceCenterData {
+function emptyFinanceCenter(dateRange: ResolvedDateRange): FinanceCenterData {
   return {
-    period,
-    bounds,
+    dateRange,
+    period: "month",
+    bounds: dateRange.bounds,
     cars: EMPTY_CARS,
     detailing: EMPTY_DETAILING,
     documentsWorkload: EMPTY_WORKLOAD,
-    documentsProfit: null,
+    documents: EMPTY_DOCUMENTS,
+    businessDirections: EMPTY_BUSINESS_DIRECTIONS,
     combinedRealized: 0,
     comparisons: {
       realizedProfit: null,
       detailingRevenue: null,
       detailingExpenses: null,
       detailingNetResult: null,
+      documentsProfit: null,
     },
     profitTrend: [],
-    directionSummary: [],
+    directionSummary: buildFinanceDirectionChartSummary({
+      carsProfit: 0,
+      detailingNet: 0,
+      documentsProfit: 0,
+    }),
     topProfitSources: [],
     expenseBreakdown: [],
     errors: {},
@@ -143,35 +178,32 @@ async function loadDetailingSummary(bounds: DashboardPeriodBounds) {
     date_from: bounds.start,
     date_to: bounds.end,
   });
-  return {
-    orderCount: report.orderCount,
-    revenue: report.deliveredRevenue,
-    commissions: report.employeeCommissions,
-    expenses: report.expenses,
-    netResult: report.netResult,
-  };
+  return mapDetailingFinanceReportToSummary(report);
 }
 
 async function loadPeriodComparisons(input: {
-  period: FinancePeriod;
-  today: string;
+  dateRange: DateRangeFilter;
   cars: Car[];
   expensesByCar: Map<number, number>;
   tasks: DocumentTaskWithRelations[];
   current: {
     combinedRealized: number;
     detailing: DetailingFinanceSummary;
+    documents: DocumentsFinanceSummary;
   };
 }): Promise<FinanceComparisonMetrics> {
-  const previousBounds = getPreviousPeriodBounds(input.period, input.today);
-  if (!previousBounds?.start || !previousBounds?.end) {
+  const previousRange = getPreviousComparableRange(input.dateRange);
+  if (!previousRange) {
     return {
       realizedProfit: null,
       detailingRevenue: null,
       detailingExpenses: null,
       detailingNetResult: null,
+      documentsProfit: null,
     };
   }
+
+  const previousBounds = { start: previousRange.from, end: previousRange.to };
 
   const previousCars = computeCarsFinanceSummary({
     cars: input.cars,
@@ -179,14 +211,14 @@ async function loadPeriodComparisons(input: {
     bounds: previousBounds,
   });
   const previousDetailing = await loadDetailingSummary(previousBounds);
-  const previousDocumentsProfit = computeDocumentsRealizedProfit(
-    input.tasks,
-    previousBounds
-  );
+  const previousDocuments = getDocumentsFinanceSummary({
+    tasks: input.tasks,
+    bounds: previousBounds,
+  });
   const previousCombined = computeCombinedRealizedResult({
     carsRealizedProfit: previousCars.realizedProfit,
     detailingNetResult: previousDetailing.netResult,
-    documentsProfit: previousDocumentsProfit,
+    documentsProfit: previousDocuments.profit,
   });
 
   return {
@@ -206,22 +238,30 @@ async function loadPeriodComparisons(input: {
       input.current.detailing.netResult,
       previousDetailing.netResult
     ),
+    documentsProfit: buildPeriodComparison(
+      input.current.documents.profit,
+      previousDocuments.profit
+    ),
   };
 }
 
-export async function getFinanceCenterData(
-  periodInput?: string | null
-): Promise<FinanceCenterData> {
-  const period = parseFinanceCenterPeriod(periodInput);
-  const today = getPragueTodayDateString();
-  const bounds = getDashboardPeriodBounds(period, today);
-  const trendStart = bounds.start ?? addDays(today, -29);
+export async function getFinanceCenterData(input?: {
+  from?: string | null;
+  to?: string | null;
+  preset?: string | null;
+  period?: string | null;
+}): Promise<FinanceCenterData> {
+  const dateRange = parseDateRangeSearchParams(input ?? {});
+  const period = parseFinanceCenterPeriod(input?.period ?? input?.preset);
+  const bounds = dateRange.bounds;
+  const trendStart = bounds.start ?? dateRange.from;
   const errors: FinanceCenterSectionErrors = {};
 
   if (!bounds.start || !bounds.end) {
-    return emptyFinanceCenter(period, bounds);
+    return emptyFinanceCenter(dateRange);
   }
 
+  const today = getPragueTodayDateString();
   const supabase = await createClient();
 
   const [carsResult, expensesResult, tasksResult] = await Promise.allSettled([
@@ -255,7 +295,7 @@ export async function getFinanceCenterData(
   }
 
   if (errors.core) {
-    return { ...emptyFinanceCenter(period, bounds), errors };
+    return { ...emptyFinanceCenter(dateRange), errors };
   }
 
   const carsSummary = computeCarsFinanceSummary({
@@ -277,14 +317,23 @@ export async function getFinanceCenterData(
     bounds,
   });
 
-  const documentsProfitValue = computeDocumentsRealizedProfit(tasks, bounds);
-  const documentsProfit =
-    documentsProfitValue !== 0 ? documentsProfitValue : null;
+  const documentsSummary = getDocumentsFinanceSummary({ tasks, bounds });
+  const carsRealizedExpenses = computeCarsRealizedExpensesInPeriod({
+    cars,
+    expensesByCar,
+    bounds,
+  });
+  const businessDirections = buildFinanceBusinessDirectionCards({
+    cars: carsSummary,
+    carsRealizedExpenses,
+    detailing: detailingSummary,
+    documents: documentsSummary,
+  });
 
   const combinedRealized = computeCombinedRealizedResult({
     carsRealizedProfit: carsSummary.realizedProfit,
     detailingNetResult: detailingSummary.netResult,
-    documentsProfit: documentsProfit ?? 0,
+    documentsProfit: documentsSummary.profit,
   });
 
   let comparisons: FinanceComparisonMetrics = {
@@ -292,23 +341,31 @@ export async function getFinanceCenterData(
     detailingRevenue: null,
     detailingExpenses: null,
     detailingNetResult: null,
+    documentsProfit: null,
   };
 
   try {
     comparisons = await loadPeriodComparisons({
-      period,
-      today,
+      dateRange,
       cars,
       expensesByCar,
       tasks,
-      current: { combinedRealized, detailing: detailingSummary },
+      current: {
+        combinedRealized,
+        detailing: detailingSummary,
+        documents: documentsSummary,
+      },
     });
   } catch {
     errors.comparisons = true;
   }
 
   let profitTrend: ProfitTrendPoint[] = [];
-  let directionSummary: FinanceDirectionSummary[] = [];
+  const directionSummary = buildFinanceDirectionChartSummary({
+    carsProfit: businessDirections.cars.profit,
+    detailingNet: businessDirections.detailing.netResult,
+    documentsProfit: businessDirections.documents.profit,
+  });
 
   try {
     const [chartOrdersResult, chartExpensesResult] = await Promise.all([
@@ -334,35 +391,14 @@ export async function getFinanceCenterData(
           mapDetailingOrder(row as Record<string, unknown>)
         )
       );
-      const trendDays = Math.max(
-        1,
-        Math.ceil(
-          (new Date(bounds.end).getTime() - new Date(trendStart).getTime()) /
-            (1000 * 60 * 60 * 24)
-        ) + 1
-      );
-
       profitTrend = buildProfitTrendSeries({
-        today: bounds.end,
+        rangeStart: trendStart,
+        rangeEnd: bounds.end,
         cars,
         expensesByCar,
         detailingOrders: chartOrders,
         detailingExpenses: chartExpensesResult.data ?? [],
         documentTasks: tasks,
-        days: Math.min(trendDays, 90),
-      });
-
-      const directionBars = buildProfitDirectionBars({
-        today: bounds.end,
-        cars,
-        expensesByCar,
-        detailingNet: detailingSummary.netResult,
-        documentTasks: tasks,
-      });
-
-      directionSummary = simplifyFinanceDirectionBars({
-        bars: directionBars,
-        documentsProfit,
       });
     }
   } catch {
@@ -392,6 +428,7 @@ export async function getFinanceCenterData(
       expensesByCar,
       bounds,
       detailingOrders,
+      documentTasks: tasks,
     });
   } catch {
     errors.topSources = true;
@@ -430,12 +467,14 @@ export async function getFinanceCenterData(
   }
 
   return {
+    dateRange,
     period,
     bounds,
     cars: carsSummary,
     detailing: detailingSummary,
     documentsWorkload,
-    documentsProfit,
+    documents: documentsSummary,
+    businessDirections,
     combinedRealized,
     comparisons,
     profitTrend,

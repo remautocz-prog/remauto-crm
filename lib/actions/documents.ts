@@ -23,6 +23,10 @@ import { normalizeDocumentPriority } from "@/lib/documents/priority-styles";
 import { normalizeDocumentTaskStatus } from "@/lib/documents/status";
 import { getDocumentTaskById } from "@/lib/queries/documents";
 import { createClient } from "@/lib/supabase/server";
+import { insertIdentityReturningId } from "@/lib/supabase/safe-insert";
+import { guardPermission, guardPermanentDelete } from "@/lib/auth/action-guard";
+import { requireAuthenticatedAccess } from "@/lib/auth/access";
+import { formatDeleteActionError } from "@/lib/utils/action-errors";
 import type {
   DocumentPaymentInput,
   DocumentStatusChangeInput,
@@ -143,6 +147,8 @@ export async function createDocumentTaskAction(
   input: DocumentTaskFormInput,
   options?: { confirmOverpayment?: boolean }
 ): Promise<ActionResult<{ id: number }>> {
+  const denied = await guardPermission<{ id: number }>("documents.create");
+  if (denied) return denied;
   const fieldErrors = await mapValidationIssuesToFieldErrors(
     collectDocumentValidationIssues(input, options)
   );
@@ -158,11 +164,11 @@ export async function createDocumentTaskAction(
   const finalPayload = finalizeTaskPayload(payload, input);
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("document_tasks")
-    .insert(finalPayload)
-    .select("id")
-    .single();
+  const { id, error } = await insertIdentityReturningId(
+    supabase,
+    "document_tasks",
+    finalPayload as Record<string, unknown>
+  );
 
   if (error) {
     console.error("[createDocumentTaskAction]", error, finalPayload);
@@ -170,10 +176,10 @@ export async function createDocumentTaskAction(
   }
 
   try {
-    await syncDocumentTaskServices(data.id, input.services ?? [], []);
+    await syncDocumentTaskServices(id, input.services ?? [], []);
   } catch (serviceError) {
     console.error("[createDocumentTaskAction] service sync failed", serviceError);
-    await supabase.from("document_tasks").delete().eq("id", data.id);
+    await supabase.from("document_tasks").delete().eq("id", id);
     const t = await getTranslations("documents");
     return {
       success: false,
@@ -191,7 +197,7 @@ export async function createDocumentTaskAction(
   if (input.client_id) revalidatePath(`/clients/${input.client_id}`);
   if (input.car_id) revalidatePath(`/cars/${input.car_id}`);
 
-  return { success: true, data: { id: data.id } };
+  return { success: true, data: { id } };
 }
 
 export async function updateDocumentTaskAction(
@@ -199,6 +205,8 @@ export async function updateDocumentTaskAction(
   input: DocumentTaskFormInput,
   options?: { confirmOverpayment?: boolean }
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const fieldErrors = await mapValidationIssuesToFieldErrors(
     collectDocumentValidationIssues(input, options)
   );
@@ -254,6 +262,8 @@ export async function updateDocumentChecklistAction(
   required_documents: DocumentTaskFormInput["required_documents"],
   received_documents: DocumentTaskFormInput["received_documents"]
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("document_tasks")
@@ -277,6 +287,8 @@ export async function changeDocumentStatusAction(
   id: number,
   input: DocumentStatusChangeInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const existing = await getDocumentTaskById(id);
   if (!existing) {
     const t = await getTranslations("documents");
@@ -328,6 +340,8 @@ export async function updateDocumentTaskPriorityAction(
   id: number,
   priority: string
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const existing = await getDocumentTaskById(id);
   if (!existing) {
     const t = await getTranslations("documents");
@@ -356,6 +370,8 @@ export async function updateDocumentTaskAssignmentAction(
   id: number,
   assignedTo: string | null
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const existing = await getDocumentTaskById(id);
   if (!existing) {
     const t = await getTranslations("documents");
@@ -383,6 +399,8 @@ export async function updateDocumentTaskDeadlineAction(
   id: number,
   dueDate: string | null
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const existing = await getDocumentTaskById(id);
   if (!existing) {
     const t = await getTranslations("documents");
@@ -410,6 +428,8 @@ export async function registerDocumentPaymentAction(
   id: number,
   input: DocumentPaymentInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const existing = await getDocumentTaskById(id);
   if (!existing) {
     const t = await getTranslations("documents");
@@ -449,6 +469,8 @@ export async function registerDocumentPaymentAction(
 }
 
 export async function markDocumentTaskPaidAction(id: number): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const existing = await getDocumentTaskById(id);
   if (!existing) {
     const t = await getTranslations("documents");
@@ -492,6 +514,8 @@ export async function updateDocumentTaskPaymentAction(
   },
   options?: { confirmOverpayment?: boolean }
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const existing = await getDocumentTaskById(id);
   if (!existing) {
     const t = await getTranslations("documents");
@@ -552,10 +576,28 @@ export async function updateDocumentTaskPaymentAction(
 }
 
 export async function archiveDocumentTaskAction(id: number): Promise<ActionResult> {
+  const denied = await guardPermission("documents.archive");
+  if (denied) return denied;
+
+  const access = await requireAuthenticatedAccess();
+  const existing = await getDocumentTaskById(id);
+  if (!existing) {
+    const t = await getTranslations("documents");
+    return { success: false, error: t("taskNotFound") };
+  }
+
+  if (access.role === "documents" && existing.assigned_to !== access.userId) {
+    const t = await getTranslations("access");
+    return { success: false, error: t("permissionDenied") };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("document_tasks")
-    .update({ archived_at: new Date().toISOString() })
+    .update({
+      archived_at: new Date().toISOString(),
+      archived_by: access.userId,
+    })
     .eq("id", id);
 
   if (error) {
@@ -563,28 +605,86 @@ export async function archiveDocumentTaskAction(id: number): Promise<ActionResul
   }
 
   revalidatePath("/documents");
-  revalidatePath("/dashboard");
-  redirect("/documents");
-}
-
-export async function restoreDocumentTaskAction(id: number): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("document_tasks")
-    .update({ archived_at: null })
-    .eq("id", id);
-
-  if (error) {
-    return { success: false, error: await formatSupabaseError(error) };
-  }
-
-  revalidatePath("/documents");
+  revalidatePath("/documents/dashboard");
   revalidatePath(`/documents/${id}`);
   revalidatePath("/dashboard");
+  if (existing.client_id) revalidatePath(`/clients/${existing.client_id}`);
   return { success: true };
 }
 
+export async function restoreDocumentTaskAction(id: number): Promise<ActionResult> {
+  const denied = await guardPermission("documents.archive");
+  if (denied) return denied;
+
+  const access = await requireAuthenticatedAccess();
+  const existing = await getDocumentTaskById(id);
+  if (!existing) {
+    const t = await getTranslations("documents");
+    return { success: false, error: t("taskNotFound") };
+  }
+
+  if (access.role === "documents" && existing.assigned_to !== access.userId) {
+    const t = await getTranslations("access");
+    return { success: false, error: t("permissionDenied") };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("document_tasks")
+    .update({
+      archived_at: null,
+      archived_by: null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidatePath("/documents");
+  revalidatePath("/documents/dashboard");
+  revalidatePath(`/documents/${id}`);
+  revalidatePath("/dashboard");
+  if (existing.client_id) revalidatePath(`/clients/${existing.client_id}`);
+  return { success: true };
+}
+
+export async function deleteDocumentTaskAction(id: number): Promise<ActionResult> {
+  const denied = await guardPermanentDelete();
+  if (denied) return denied;
+
+  const t = await getTranslations("documents");
+  const existing = await getDocumentTaskById(id);
+  if (!existing) {
+    return { success: false, error: t("taskNotFound") };
+  }
+
+  const supabase = await createClient();
+  const { error: servicesError } = await supabase
+    .from("document_task_services")
+    .delete()
+    .eq("document_task_id", id);
+
+  if (servicesError) {
+    return { success: false, error: await formatDeleteActionError(servicesError) };
+  }
+
+  const { error } = await supabase.from("document_tasks").delete().eq("id", id);
+  if (error) {
+    return { success: false, error: await formatDeleteActionError(error) };
+  }
+
+  revalidatePath("/documents");
+  revalidatePath("/dashboard");
+  revalidatePath("/finance");
+  if (existing.client_id) revalidatePath(`/clients/${existing.client_id}`);
+  if (existing.car_id) revalidatePath(`/cars/${existing.car_id}`);
+  redirect("/documents");
+}
+
 export async function getDocumentTaskAction(id: number) {
+  const denied = await guardPermission("documents.view");
+  if (denied) return null;
   const task = await getDocumentTaskById(id);
   return task ? mapDocumentTask(task as unknown as Record<string, unknown>) : null;
 }

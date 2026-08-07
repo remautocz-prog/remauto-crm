@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { getClientNoteById } from "@/lib/queries/client-notes";
 import { createClient } from "@/lib/supabase/server";
+import { guardPermission, guardPermanentDelete } from "@/lib/auth/action-guard";
 import type { ClientNoteFormInput } from "@/lib/types/clients";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
 
@@ -19,6 +20,8 @@ export async function createClientNoteAction(
   clientId: number,
   input: ClientNoteFormInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("clients.update");
+  if (denied) return denied;
   const content = input.content?.trim();
   if (!content) {
     const t = await getTranslations("clients");
@@ -44,6 +47,8 @@ export async function updateClientNoteAction(
   noteId: string,
   input: ClientNoteFormInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("clients.update");
+  if (denied) return denied;
   const note = await getClientNoteById(noteId);
   if (!note) {
     const t = await getTranslations("clients");
@@ -77,6 +82,8 @@ export async function updateClientNoteAction(
 }
 
 export async function deleteClientNoteAction(noteId: string): Promise<ActionResult> {
+  const denied = await guardPermanentDelete();
+  if (denied) return denied;
   const note = await getClientNoteById(noteId);
   if (!note) {
     const t = await getTranslations("clients");

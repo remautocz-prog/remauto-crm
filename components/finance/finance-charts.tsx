@@ -110,7 +110,7 @@ type FinanceDirectionChartProps = {
 
 const BAR_COLORS: Record<string, string> = {
   cars: "bg-sky-500",
-  detailing: "bg-cyan-500",
+  detailing: "bg-orange-500",
   documents: "bg-violet-500",
 };
 

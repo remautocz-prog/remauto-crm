@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 type UserNavProps = {
   email: string;
   avatarUrl?: string | null;
+  canManageUsers?: boolean;
+  canViewSettings?: boolean;
 };
 
 function getInitials(email: string) {
@@ -25,10 +27,16 @@ function getInitials(email: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function UserNav({ email, avatarUrl }: UserNavProps) {
+export function UserNav({
+  email,
+  avatarUrl,
+  canManageUsers = false,
+  canViewSettings = true,
+}: UserNavProps) {
   const router = useRouter();
   const tActions = useTranslations("actions");
   const tNav = useTranslations("nav");
+  const tAccess = useTranslations("access");
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -59,10 +67,18 @@ export function UserNav({ email, avatarUrl }: UserNavProps) {
           <User className="mr-2 h-4 w-4" />
           {tActions("profile")}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/settings")}>
-          <Settings className="mr-2 h-4 w-4" />
-          {tNav("settings")}
-        </DropdownMenuItem>
+        {canManageUsers ? (
+          <DropdownMenuItem onClick={() => router.push("/settings/users")}>
+            <Users className="mr-2 h-4 w-4" />
+            {tAccess("employees")}
+          </DropdownMenuItem>
+        ) : null}
+        {canViewSettings ? (
+          <DropdownMenuItem onClick={() => router.push("/settings")}>
+            <Settings className="mr-2 h-4 w-4" />
+            {tNav("settings")}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-red-500">
           <LogOut className="mr-2 h-4 w-4" />

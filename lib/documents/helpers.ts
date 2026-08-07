@@ -81,6 +81,7 @@ export function mapDocumentTask(row: Record<string, unknown>): DocumentTask {
     notes: (row.notes as string | null) ?? null,
     result_notes: (row.result_notes as string | null) ?? null,
     archived_at: (row.archived_at as string | null) ?? null,
+    archived_by: (row.archived_by as string | null) ?? null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at ?? row.created_at),
   };
@@ -191,6 +192,16 @@ export function isCompletedButUnpaid(task: DocumentTask) {
   return summary.paymentStatus !== "paid" && summary.outstandingBalance > 0;
 }
 
+export function hasMissingRequiredDocuments(
+  task: Pick<DocumentTask, "required_documents" | "received_documents">
+): boolean {
+  if (!task.required_documents?.length) return false;
+  const receivedKeys = new Set(
+    (task.received_documents ?? []).map((item) => item.key)
+  );
+  return task.required_documents.some((item) => !receivedKeys.has(item.key));
+}
+
 export function getTaskServiceLabel(
   task: Pick<DocumentTask, "service_type" | "work_type" | "custom_service_name">
 ) {
@@ -208,6 +219,7 @@ export function mergeTaskRelations(
   const client = row.clients as DocumentTaskWithRelations["client"];
   const car = row.cars as DocumentTaskWithRelations["car"];
   const assignee = row.assignee as DocumentTaskWithRelations["assignee"];
+  const archiver = row.archiver as DocumentTaskWithRelations["archiver"];
   const rawServices = row.document_task_services as Record<string, unknown>[] | null | undefined;
   const services = rawServices?.length
     ? sortDocumentTaskServices(
@@ -223,6 +235,7 @@ export function mergeTaskRelations(
     client: client ?? null,
     car: car ?? null,
     assignee: assignee ?? null,
+    archiver: archiver ?? null,
   };
 }
 

@@ -34,6 +34,8 @@ type DetailingDashboardProps = {
   attention: DetailingOrderWithServices[];
   recentOrders: DetailingOrderWithServices[];
   hasOrders: boolean;
+  showCompanyFinancials?: boolean;
+  canManagePayments?: boolean;
 };
 
 export function DetailingDashboard({
@@ -42,6 +44,8 @@ export function DetailingDashboard({
   attention,
   recentOrders,
   hasOrders,
+  showCompanyFinancials = true,
+  canManagePayments = true,
 }: DetailingDashboardProps) {
   const t = useTranslations("detailing");
   const { formatCurrency, formatDate } = useFormatters();
@@ -87,15 +91,18 @@ export function DetailingDashboard({
             iconAccent="text-emerald-400"
             href="/detailing/orders?status=ready"
           />
-          <DetailingStatCard
-            label={t("metrics.revenueToday")}
-            value={formatCurrency(stats.revenueToday)}
-            icon={TrendingUp}
-            iconAccent="text-green-400"
-          />
+          {showCompanyFinancials ? (
+            <DetailingStatCard
+              label={t("metrics.revenueToday")}
+              value={formatCurrency(stats.revenueToday)}
+              icon={TrendingUp}
+              iconAccent="text-green-400"
+            />
+          ) : null}
         </div>
       </section>
 
+      {showCompanyFinancials ? (
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
           {t("currentMonth")}
@@ -131,6 +138,7 @@ export function DetailingDashboard({
           />
         </div>
       </section>
+      ) : null}
 
       {!hasOrders ? (
         <DetailingEmptyState
@@ -189,16 +197,20 @@ export function DetailingDashboard({
               </td>
               <td className="px-4 py-3">{buildOrderEmployeeNames(order, order.services ?? [])}</td>
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                <DetailingPaymentStatusControl
-                  orderId={order.id}
-                  orderStatus={order.status}
-                  paymentStatus={order.payment_status}
-                  paidAmount={order.paid_amount}
-                  remainingAmount={order.remaining_amount}
-                  finalPrice={order.final_price}
-                  onToast={setToast}
-                  compact
-                />
+                {canManagePayments ? (
+                  <DetailingPaymentStatusControl
+                    orderId={order.id}
+                    orderStatus={order.status}
+                    paymentStatus={order.payment_status}
+                    paidAmount={order.paid_amount}
+                    remainingAmount={order.remaining_amount}
+                    finalPrice={order.final_price}
+                    onToast={setToast}
+                    compact
+                  />
+                ) : (
+                  <span className="text-zinc-400">{order.payment_status}</span>
+                )}
               </td>
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                 <DetailingOrderStatusControl
@@ -229,16 +241,18 @@ export function DetailingDashboard({
                     {order.order_number}
                   </Link>
                   <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-                    <DetailingPaymentStatusControl
-                      orderId={order.id}
-                      orderStatus={order.status}
-                      paymentStatus={order.payment_status}
-                      paidAmount={order.paid_amount}
-                      remainingAmount={order.remaining_amount}
-                      finalPrice={order.final_price}
-                      onToast={setToast}
-                      compact
-                    />
+                    {canManagePayments ? (
+                      <DetailingPaymentStatusControl
+                        orderId={order.id}
+                        orderStatus={order.status}
+                        paymentStatus={order.payment_status}
+                        paidAmount={order.paid_amount}
+                        remainingAmount={order.remaining_amount}
+                        finalPrice={order.final_price}
+                        onToast={setToast}
+                        compact
+                      />
+                    ) : null}
                     <DetailingOrderStatusControl
                       orderId={order.id}
                       status={order.status}
@@ -281,16 +295,18 @@ export function DetailingDashboard({
                     {order.order_number}
                   </Link>
                   <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-                    <DetailingPaymentStatusControl
-                      orderId={order.id}
-                      orderStatus={order.status}
-                      paymentStatus={order.payment_status}
-                      paidAmount={order.paid_amount}
-                      remainingAmount={order.remaining_amount}
-                      finalPrice={order.final_price}
-                      onToast={setToast}
-                      compact
-                    />
+                    {canManagePayments ? (
+                      <DetailingPaymentStatusControl
+                        orderId={order.id}
+                        orderStatus={order.status}
+                        paymentStatus={order.payment_status}
+                        paidAmount={order.paid_amount}
+                        remainingAmount={order.remaining_amount}
+                        finalPrice={order.final_price}
+                        onToast={setToast}
+                        compact
+                      />
+                    ) : null}
                     <DetailingOrderStatusControl
                       orderId={order.id}
                       status={order.status}

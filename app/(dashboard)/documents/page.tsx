@@ -3,8 +3,14 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { DocumentsList } from "@/components/documents/documents-list";
 import { LoadingScreen } from "@/components/shared/loading-screen";
+import { getCurrentUserAccess } from "@/lib/auth/access";
+import { hasPermission } from "@/lib/auth/permissions";
+import { parseDocumentListSegment } from "@/lib/documents/list-segment";
 import { getClientOptions, getProfileOptions } from "@/lib/queries/cars";
-import { getDocumentFilterOptions, getDocumentTasks } from "@/lib/queries/documents";
+import {
+  getDocumentFilterOptions,
+  getDocumentTasksForList,
+} from "@/lib/queries/documents";
 import { createClient } from "@/lib/supabase/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,6 +35,7 @@ type DocumentsPageProps = {
     no_deadline?: string;
     unassigned_only?: string;
     archived?: string;
+    segment?: string;
     sort?: string;
     view?: string;
     client_id?: string;
@@ -60,6 +67,10 @@ async function DocumentsPageContent({
   searchParams: DocumentsPageProps["searchParams"];
 }) {
   const params = await searchParams;
+  const segment = parseDocumentListSegment({
+    segment: params.segment,
+    archived: params.archived === "1",
+  });
   const q = params.q ?? "";
   const status = params.status ?? "all";
   const priority = params.priority ?? "all";
@@ -75,14 +86,20 @@ async function DocumentsPageContent({
   const unassignedOnly =
     params.unassigned_only === "1" || params.assignment === "unassigned";
   const outstandingOnly = params.payment === "unpaid";
-  const archived = params.archived === "1";
   const sort = params.sort ?? "newest";
-  const view = params.view === "kanban" ? "kanban" : "table";
+  const view =
+    segment === "active" && params.view === "kanban" ? "kanban" : "table";
   const initialClientId = params.client_id ? Number(params.client_id) : null;
   const initialCarId = params.car_id ? Number(params.car_id) : null;
 
+  const access = await getCurrentUserAccess();
+  const role = access?.role ?? "inactive";
+  const showArchiveMetadata = hasPermission(role, "users.view");
+  const canRestoreArchived = hasPermission(role, "documents.archive");
+  const canArchive = hasPermission(role, "documents.archive");
+
   const [tasks, clients, cars, profiles, filterOptions] = await Promise.all([
-    getDocumentTasks({
+    getDocumentTasksForList({
       q,
       status,
       priority,
@@ -95,7 +112,7 @@ async function DocumentsPageContent({
       no_deadline: noDeadline,
       unassigned_only: unassignedOnly,
       outstanding_only: outstandingOnly,
-      archived,
+      segment,
       sort,
     }),
     getClientOptions(),
@@ -122,9 +139,12 @@ async function DocumentsPageContent({
       initialDueThisWeek={dueThisWeek}
       initialNoDeadline={noDeadline}
       initialUnassignedOnly={unassignedOnly}
-      initialArchived={archived}
+      initialSegment={segment}
       initialSort={sort}
       initialView={view}
+      showArchiveMetadata={showArchiveMetadata}
+      canRestoreArchived={canRestoreArchived}
+      canArchive={canArchive}
       initialClientId={
         initialClientId != null && !Number.isNaN(initialClientId) ? initialClientId : null
       }

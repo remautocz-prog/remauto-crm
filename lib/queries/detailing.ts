@@ -1,3 +1,4 @@
+import { syncDetailingEmployeesFromProfiles } from "@/lib/detailing/employee-sync";
 import { createClient } from "@/lib/supabase/server";
 import {
   ACTIVE_DETAILING_ORDER_STATUSES,
@@ -29,6 +30,7 @@ import type {
   DetailingOrderWithServices,
   DetailingService,
 } from "@/lib/types/detailing";
+import type { Profile } from "@/lib/types/cars";
 
 export type DetailingOrdersListParams = {
   q?: string;
@@ -105,6 +107,7 @@ export function mapDetailingOrder(row: Record<string, unknown>): DetailingOrder 
     remaining_amount: Number(row.remaining_amount ?? 0),
     payment_status: row.payment_status as DetailingPaymentStatus,
     archived_at: (row.archived_at as string | null) ?? null,
+    created_by: row.created_by != null ? String(row.created_by) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at ?? row.created_at),
   };
@@ -245,10 +248,12 @@ export async function getDetailingOrdersByCarId(carId: number) {
 }
 
 export async function getDetailingEmployees(includeInactive = false) {
+  await syncDetailingEmployeesFromProfiles();
+
   const supabase = await createClient();
   let query = supabase
     .from("detailing_employee_settings")
-    .select("*, profile:profiles!profile_id ( id, full_name )")
+    .select("*, profile:profiles!profile_id ( id, full_name, role, is_active )")
     .order("display_name", { ascending: true, nullsFirst: false });
 
   if (!includeInactive) {
@@ -258,19 +263,35 @@ export async function getDetailingEmployees(includeInactive = false) {
   const { data, error } = await query;
   if (error) handleDetailingQueryError("getDetailingEmployees", error);
 
-  return (data ?? []).map((row) => {
-    const settings = row as Record<string, unknown>;
-    return {
-      id: String(settings.id),
-      profile_id: String(settings.profile_id),
-      active: Boolean(settings.active),
-      commission_percent: Number(settings.commission_percent ?? 35),
-      display_name: (settings.display_name as string | null) ?? null,
-      created_at: String(settings.created_at),
-      updated_at: String(settings.updated_at ?? settings.created_at),
-      profile: (settings.profile as DetailingEmployeeWithProfile["profile"]) ?? null,
-    } satisfies DetailingEmployeeWithProfile;
-  });
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  const employees = rows
+    .filter((row) => {
+      if (includeInactive) return true;
+      const profile = row.profile as { role?: string; is_active?: boolean } | null;
+      return (
+        Boolean(row.active) &&
+        profile?.role === "detailing" &&
+        profile?.is_active === true
+      );
+    })
+    .map((row) => {
+      const profile = row.profile as { id: string; full_name: string | null } | null;
+      return {
+        id: String(row.id),
+        profile_id: String(row.profile_id),
+        active: Boolean(row.active),
+        commission_percent: Number(row.commission_percent ?? 35),
+        display_name: (row.display_name as string | null) ?? null,
+        created_at: String(row.created_at),
+        updated_at: String(row.updated_at ?? row.created_at),
+        profile: profile
+          ? { id: profile.id, full_name: profile.full_name }
+          : null,
+      } satisfies DetailingEmployeeWithProfile;
+    });
+
+  return employees;
 }
 
 export async function getDetailingEmployeeByProfileId(profileId: string) {
@@ -643,8 +664,15 @@ export async function getDetailingFinanceReport(params: {
   };
 }
 
-import { getProfileOptions } from "@/lib/queries/cars";
-
 export async function getProfileOptionsForDetailingEmployees() {
-  return getProfileOptions();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .eq("role", "detailing")
+    .eq("is_active", true)
+    .order("full_name", { ascending: true });
+
+  if (error) handleDetailingQueryError("getProfileOptionsForDetailingEmployees", error);
+  return (data ?? []) as Profile[];
 }

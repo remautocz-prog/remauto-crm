@@ -43,6 +43,11 @@ type CarDetailsProps = {
   generatedDocuments?: GeneratedDocument[];
   deals?: DealWithRelations[];
   detailingOrders?: DetailingOrderWithServices[];
+  canPermanentlyDelete?: boolean;
+  showFinanceCards?: boolean;
+  canEditCar?: boolean;
+  showDetailingSection?: boolean;
+  canManageExpenses?: boolean;
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -66,6 +71,11 @@ export function CarDetails({
   generatedDocuments = [],
   deals = [],
   detailingOrders = [],
+  canPermanentlyDelete = false,
+  showFinanceCards = true,
+  canEditCar = true,
+  showDetailingSection = true,
+  canManageExpenses = false,
 }: CarDetailsProps) {
   const [soldOpen, setSoldOpen] = useState(false);
   const tDocuments = useTranslations("documents");
@@ -128,29 +138,35 @@ export function CarDetails({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="secondary">
-            <Link href={`/cars/${car.id}/edit`}>
-              <Pencil className="h-4 w-4" />
-              {tActions("edit")}
-            </Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href={`/detailing/orders/new?car_id=${car.id}`}>
-              <Sparkles className="h-4 w-4" />
-              {t("sendToDetailing")}
-            </Link>
-          </Button>
-          {car.status !== "sold" ? (
+          {canEditCar ? (
+            <Button asChild variant="secondary">
+              <Link href={`/cars/${car.id}/edit`}>
+                <Pencil className="h-4 w-4" />
+                {tActions("edit")}
+              </Link>
+            </Button>
+          ) : null}
+          {canEditCar ? (
+            <Button asChild variant="secondary">
+              <Link href={`/detailing/orders/new?car_id=${car.id}`}>
+                <Sparkles className="h-4 w-4" />
+                {t("sendToDetailing")}
+              </Link>
+            </Button>
+          ) : null}
+          {canEditCar && car.status !== "sold" ? (
             <Button onClick={() => setSoldOpen(true)}>
               <BadgeCheck className="h-4 w-4" />
               {tActions("markAsSold")}
             </Button>
           ) : null}
-          <DeleteCarButton carId={car.id} />
+          {canPermanentlyDelete ? <DeleteCarButton carId={car.id} /> : null}
         </div>
       </div>
 
-      <CarFinanceCards car={car} totalExpenses={totalExpenses} />
+      {showFinanceCards ? (
+        <CarFinanceCards car={car} totalExpenses={totalExpenses} />
+      ) : null}
 
       <CarNextActionPanel
         car={car}
@@ -350,11 +366,19 @@ export function CarDetails({
           </CardContent>
         </Card>
 
-      {(model === "owned" || model === "commission" || model === "client_order") && (
-        <CarExpensesSection car={car} expenses={expenses} />
-      )}
+      {showFinanceCards &&
+      (model === "owned" || model === "commission" || model === "client_order") ? (
+        <CarExpensesSection
+          car={car}
+          expenses={expenses}
+          canPermanentlyDelete={canPermanentlyDelete}
+          canManageExpenses={canManageExpenses}
+        />
+      ) : null}
 
-      <CarDetailingSection carId={car.id} orders={detailingOrders} />
+      {showDetailingSection ? (
+        <CarDetailingSection carId={car.id} orders={detailingOrders} />
+      ) : null}
 
       {car.status === CAR_STATUS_SOLD ? (
         <CarSaleDocumentsPanel

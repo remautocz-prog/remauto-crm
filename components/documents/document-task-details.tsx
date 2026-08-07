@@ -8,7 +8,6 @@ import { useTranslations } from "next-intl";
 import {
   ArrowLeft,
   Archive,
-  ArchiveRestore,
   Mail,
   Pencil,
   Phone,
@@ -22,6 +21,8 @@ import {
   isTaskArchived,
 } from "@/lib/documents/helpers";
 import { DocumentDeadlineDisplay } from "@/components/documents/document-deadline-display";
+import { DocumentArchivedBadge } from "@/components/documents/document-archived-badge";
+import { DocumentArchiveRestoreButton } from "@/components/documents/document-archive-restore-button";
 import { DocumentInlineAssigneeSelect } from "@/components/documents/document-inline-assignee-select";
 import { DocumentInlineDeadlineEditor } from "@/components/documents/document-inline-deadline-editor";
 import {
@@ -29,7 +30,8 @@ import {
   getDocumentVehicleTitle,
   type DocumentCarOption,
 } from "@/lib/documents/vehicle";
-import { archiveDocumentTaskAction, restoreDocumentTaskAction } from "@/lib/actions/documents";
+import { archiveDocumentTaskAction, deleteDocumentTaskAction, restoreDocumentTaskAction } from "@/lib/actions/documents";
+import { PermanentDeleteButton } from "@/components/shared/permanent-delete-button";
 import { GeneratedDocumentsPanel } from "@/components/document-generator/generated-documents-panel";
 import { DocumentChecklist } from "@/components/documents/document-checklist";
 import { DocumentTaskFinancePanel } from "@/components/documents/document-task-finance-panel";
@@ -55,6 +57,10 @@ type DocumentTaskDetailsProps = {
   profiles: Profile[];
   documentTemplates: DocumentTemplate[];
   generatedDocuments: GeneratedDocument[];
+  canPermanentlyDelete?: boolean;
+  canArchive?: boolean;
+  canRestoreArchived?: boolean;
+  showArchiveMetadata?: boolean;
 };
 
 function InfoRow({
@@ -79,6 +85,10 @@ export function DocumentTaskDetails({
   profiles,
   documentTemplates,
   generatedDocuments,
+  canPermanentlyDelete = false,
+  canArchive = false,
+  canRestoreArchived = false,
+  showArchiveMetadata = false,
 }: DocumentTaskDetailsProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -92,6 +102,7 @@ export function DocumentTaskDetails({
 
   const t = useTranslations("documents");
   const tActions = useTranslations("actions");
+  const tAccess = useTranslations("access");
   const tFields = useTranslations("fields");
   const tCommon = useTranslations("common");
   const tServices = useTranslations("documents.services");
@@ -116,12 +127,21 @@ export function DocumentTaskDetails({
 
   async function handleArchive() {
     if (!confirm(t("archiveConfirm"))) return;
-    await archiveDocumentTaskAction(task.id);
+    const result = await archiveDocumentTaskAction(task.id);
+    if (result.success) {
+      router.refresh();
+    } else if (result.error) {
+      showToast({ type: "error", message: result.error });
+    }
   }
 
   async function handleRestore() {
     const result = await restoreDocumentTaskAction(task.id);
-    if (result.success) router.refresh();
+    if (result.success) {
+      router.refresh();
+    } else if (result.error) {
+      showToast({ type: "error", message: result.error });
+    }
   }
 
   function handlePrint() {
@@ -165,7 +185,7 @@ export function DocumentTaskDetails({
                 onPriorityChange={(_id, next) => setPriority(next)}
                 onToast={showToast}
               />
-              {archived ? <span className="text-sm text-zinc-400">{t("archived")}</span> : null}
+              {archived ? <DocumentArchivedBadge /> : null}
             </div>
             <p className="text-zinc-400">{serviceLabel}</p>
           </div>
@@ -184,17 +204,21 @@ export function DocumentTaskDetails({
             <Printer className="h-4 w-4" />
             {t("printSummary")}
           </Button>
-          {archived ? (
-            <Button variant="secondary" onClick={handleRestore}>
-              <ArchiveRestore className="h-4 w-4" />
-              {t("restoreTask")}
-            </Button>
-          ) : (
+          {archived && canRestoreArchived ? (
+            <DocumentArchiveRestoreButton taskId={task.id} />
+          ) : !archived && canArchive ? (
             <Button variant="destructive" onClick={handleArchive}>
               <Archive className="h-4 w-4" />
               {t("archiveTask")}
             </Button>
-          )}
+          ) : null}
+          {canPermanentlyDelete ? (
+            <PermanentDeleteButton
+              label={tAccess("deletePermanently")}
+              description={t("deleteTaskDescription", { id: task.id })}
+              onConfirm={() => deleteDocumentTaskAction(task.id)}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -267,6 +291,18 @@ export function DocumentTaskDetails({
             <InfoRow label={t("readyDate")} value={formatDateTime(task.ready_at, dash)} />
             <InfoRow label={t("deliveredDate")} value={formatDateTime(task.delivered_at, dash)} />
             <InfoRow label={t("completedDate")} value={formatDate(task.completed_at, dash)} />
+            {archived && showArchiveMetadata ? (
+              <>
+                <InfoRow
+                  label={t("archivedAt")}
+                  value={formatDateTime(task.archived_at, dash)}
+                />
+                <InfoRow
+                  label={t("archivedBy")}
+                  value={task.archiver?.full_name ?? dash}
+                />
+              </>
+            ) : null}
             {task.notes ? (
               <div className="border-t border-zinc-800/80 pt-3">
                 <p className="text-zinc-500">{tFields("notes")}</p>
@@ -352,6 +388,7 @@ export function DocumentTaskDetails({
           clientId={task.client_id}
           vehicleId={task.car_id}
           documentTaskId={task.id}
+          canPermanentlyDelete={canPermanentlyDelete}
         />
       </div>
 

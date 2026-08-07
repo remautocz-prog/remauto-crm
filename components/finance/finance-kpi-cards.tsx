@@ -10,8 +10,10 @@ type PrimaryKpiCardProps = {
   hint?: string;
   comparison?: PeriodComparison | null;
   comparisonLabel?: string;
+  newResultLabel?: string;
+  noChangeLabel?: string;
   formatCurrency: (value: number) => string;
-  accent: "green" | "amber" | "blue" | "cyan";
+  accent: "green" | "amber" | "blue" | "cyan" | "violet";
 };
 
 const PRIMARY_ACCENTS = {
@@ -35,43 +37,72 @@ const PRIMARY_ACCENTS = {
     value: "text-cyan-300",
     glow: "from-cyan-500/10",
   },
+  violet: {
+    card: "border-violet-500/25 bg-gradient-to-br from-violet-950/30 to-zinc-950/80 shadow-[0_0_24px_-8px_rgba(139,92,246,0.28)]",
+    value: "text-violet-300",
+    glow: "from-violet-500/10",
+  },
 } as const;
 
 function ComparisonBadge({
   comparison,
   comparisonLabel,
+  newResultLabel,
+  noChangeLabel,
   formatCurrency,
 }: {
   comparison: PeriodComparison;
   comparisonLabel: string;
+  newResultLabel?: string;
+  noChangeLabel?: string;
   formatCurrency: (value: number) => string;
 }) {
-  const positive = comparison.changePercent >= 0;
+  if (comparison.kind === "new_result") {
+    return (
+      <div className="mt-2">
+        <span className="text-xs text-zinc-500">
+          {newResultLabel ?? comparisonLabel}
+        </span>
+      </div>
+    );
+  }
+
+  const positive = comparison.changePercent > 0;
+  const unchanged = comparison.kind === "unchanged";
 
   return (
     <div className="mt-2 space-y-0.5">
       <div
         className={cn(
           "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-          positive
-            ? "bg-emerald-500/10 text-emerald-300"
-            : "bg-red-500/10 text-red-300"
+          unchanged
+            ? "bg-zinc-800/60 text-zinc-400"
+            : positive
+              ? "bg-emerald-500/10 text-emerald-300"
+              : "bg-red-500/10 text-red-300"
         )}
       >
-        {positive ? (
-          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
-        ) : (
-          <ArrowDownRight className="h-3.5 w-3.5" aria-hidden />
-        )}
+        {!unchanged ? (
+          positive ? (
+            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+          ) : (
+            <ArrowDownRight className="h-3.5 w-3.5" aria-hidden />
+          )
+        ) : null}
         <span>
-          {positive ? "+" : ""}
-          {comparison.changePercent}%
+          {unchanged
+            ? (noChangeLabel ?? "0%")
+            : `${positive ? "+" : ""}${comparison.changePercent}%`}
         </span>
-        <span className="text-zinc-500">{comparisonLabel}</span>
+        {!unchanged ? (
+          <span className="text-zinc-500">{comparisonLabel}</span>
+        ) : null}
       </div>
-      <p className="text-xs text-zinc-500">
-        {formatCurrency(comparison.previousValue)}
-      </p>
+      {!unchanged ? (
+        <p className="text-xs text-zinc-500">
+          {formatCurrency(comparison.previousValue)}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -82,6 +113,8 @@ export function PrimaryKpiCard({
   hint,
   comparison,
   comparisonLabel,
+  newResultLabel,
+  noChangeLabel,
   formatCurrency,
   accent,
 }: PrimaryKpiCardProps) {
@@ -111,6 +144,8 @@ export function PrimaryKpiCard({
         <ComparisonBadge
           comparison={comparison}
           comparisonLabel={comparisonLabel}
+          newResultLabel={newResultLabel}
+          noChangeLabel={noChangeLabel}
           formatCurrency={formatCurrency}
         />
       ) : null}
@@ -124,7 +159,7 @@ type OperatingMetricCardProps = {
   comparison?: PeriodComparison | null;
   comparisonLabel?: string;
   formatCurrency: (value: number) => string;
-  accent: "blue" | "violet" | "red" | "cyan";
+  accent: "blue" | "violet" | "red" | "cyan" | "amber";
 };
 
 const OPERATING_ACCENTS = {
@@ -132,6 +167,7 @@ const OPERATING_ACCENTS = {
   violet: "border-violet-500/20 bg-violet-950/15 text-violet-300",
   red: "border-red-500/20 bg-red-950/15 text-red-300",
   cyan: "border-cyan-500/20 bg-cyan-950/15 text-cyan-300",
+  amber: "border-amber-500/20 bg-amber-950/15 text-amber-300",
 } as const;
 
 export function OperatingMetricCard({

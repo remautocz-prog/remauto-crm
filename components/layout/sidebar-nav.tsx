@@ -4,9 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
-import { navItems } from "@/lib/navigation";
+import type { NavItem } from "@/lib/navigation";
+import { getNavIcon } from "@/components/layout/nav-icons";
 
-export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+export function SidebarNav({
+  navItems,
+  onNavigate,
+}: {
+  navItems: NavItem[];
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const t = useTranslations("nav");
 
@@ -15,7 +22,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       {navItems.map((item) => {
         const isActive =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const Icon = item.icon;
+        const Icon = getNavIcon(item.icon);
 
         return (
           <Link

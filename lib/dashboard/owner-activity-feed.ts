@@ -1,4 +1,5 @@
 import { buildDashboardActivityFeed } from "@/lib/dashboard/activity-feed";
+import type { DashboardPeriodBounds } from "@/lib/dashboard/period";
 import type { Car } from "@/lib/types/cars";
 import type { Client, ClientNote } from "@/lib/types/clients";
 import type { DashboardActivityItem } from "@/lib/types/dashboard";
@@ -21,6 +22,7 @@ export function buildOwnerActivityFeed(input: {
   notes: ClientNote[];
   detailingOrders: DetailingOrderWithServices[];
   carExpenses: CarExpenseRow[];
+  bounds?: DashboardPeriodBounds;
   limit?: number;
 }): DashboardActivityItem[] {
   const carNames = new Map(
@@ -77,10 +79,17 @@ export function buildOwnerActivityFeed(input: {
     });
   }
 
-  return [...baseItems, ...extraItems]
-    .sort(
-      (a, b) =>
-        new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
-    )
-    .slice(0, input.limit ?? 10);
+  const merged = [...baseItems, ...extraItems].sort(
+    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+  );
+
+  const filtered =
+    input.bounds?.start && input.bounds?.end
+      ? merged.filter((item) => {
+          const date = item.occurredAt.slice(0, 10);
+          return date >= input.bounds!.start! && date <= input.bounds!.end!;
+        })
+      : merged;
+
+  return filtered.slice(0, input.limit ?? 10);
 }

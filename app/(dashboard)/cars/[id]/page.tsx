@@ -14,6 +14,8 @@ import { getDocumentTemplates } from "@/lib/queries/document-templates";
 import { getGeneratedDocuments } from "@/lib/queries/generated-documents";
 import { getDealsByVehicleId } from "@/lib/queries/deals";
 import { getDetailingOrdersByCarId } from "@/lib/queries/detailing";
+import { getCurrentUserAccess } from "@/lib/auth/access";
+import { canPermanentlyDelete } from "@/lib/auth/permissions";
 
 type CarDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -91,6 +93,9 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
     notFound();
   }
 
+  const access = await getCurrentUserAccess();
+  const role = access?.role ?? "inactive";
+
   return (
     <CarDetails
       car={data.car}
@@ -104,6 +109,11 @@ export default async function CarDetailPage({ params }: CarDetailPageProps) {
       generatedDocuments={data.generatedDocuments}
       deals={data.deals}
       detailingOrders={data.detailingOrders}
+      canPermanentlyDelete={canPermanentlyDelete(role)}
+      showFinanceCards={access?.permissions.has("finance.view") ?? false}
+      canEditCar={access?.permissions.has("cars.update") ?? false}
+      showDetailingSection={access?.permissions.has("detailing.view") ?? false}
+      canManageExpenses={access?.permissions.has("finance.manage") ?? false}
     />
   );
 }

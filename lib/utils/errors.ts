@@ -11,7 +11,9 @@ export async function formatSupabaseError(error: {
     hint: error.hint,
   });
 
-  return error.message ?? "Unknown database error";
+  const { extractErrorMessage } = await import("@/lib/utils/action-error-message");
+  const message = extractErrorMessage(error);
+  return message === "Unknown error" ? "Unknown database error" : message;
 }
 
 export type ActionResult<T = undefined> =

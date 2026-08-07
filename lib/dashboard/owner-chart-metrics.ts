@@ -4,7 +4,17 @@ import {
   shouldCountStatsProfit,
 } from "@/lib/cars/business-rules";
 import { getDocumentFinanceSummary } from "@/lib/documents/helpers";
+import {
+  isRecognizedDocumentTaskForFinance,
+} from "@/lib/finance/documents-summary";
 import { resolveOrderCommissionTotal } from "@/lib/detailing/finance-aggregation";
+import {
+  bucketDateForChart,
+  buildChartBucketKeys,
+  getChartGranularity,
+  type ChartGranularity,
+} from "@/lib/date-range/filter";
+import type { DashboardPeriodBounds } from "@/lib/dashboard/period";
 import { getDashboardPeriodBounds } from "@/lib/dashboard/period";
 import type { Car } from "@/lib/types/cars";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
@@ -70,21 +80,22 @@ export function computeDocumentTaskProfit(task: DocumentTaskWithRelations) {
   return getDocumentFinanceSummary(task).profit;
 }
 
-export function computeCombinedMonthlyProfit(input: {
+export function computeCombinedPeriodProfit(input: {
+  bounds: DashboardPeriodBounds;
   cars: Car[];
   expensesByCar: Map<number, number>;
   detailingNet: number;
   documentTasks: DocumentTaskWithRelations[];
-  today: string;
 }) {
-  const bounds = getDashboardPeriodBounds("month", input.today);
+  if (!input.bounds.start || !input.bounds.end) return 0;
+  const { start, end } = input.bounds;
   let carsProfit = 0;
   let documentsProfit = 0;
 
   for (const car of input.cars) {
     if (!isCarSold(car) || !shouldCountStatsProfit(car)) continue;
     const saleDate = (car.sale_date ?? car.updated_at)?.slice(0, 10);
-    if (!saleDate || saleDate < bounds.start! || saleDate > bounds.end!) continue;
+    if (!saleDate || saleDate < start || saleDate > end) continue;
     carsProfit += calculateCarProfit(
       car,
       input.expensesByCar.get(car.id) ?? 0
@@ -92,8 +103,7 @@ export function computeCombinedMonthlyProfit(input: {
   }
 
   for (const task of input.documentTasks) {
-    const completedAt = task.completed_at?.slice(0, 10);
-    if (!completedAt || completedAt < bounds.start! || completedAt > bounds.end!) {
+    if (!isRecognizedDocumentTaskForFinance(task, input.bounds)) {
       continue;
     }
     documentsProfit += computeDocumentTaskProfit(task);
@@ -102,75 +112,108 @@ export function computeCombinedMonthlyProfit(input: {
   return roundMoney(carsProfit + input.detailingNet + documentsProfit);
 }
 
-export function buildProfitTrendSeries(input: {
+export function computeCombinedMonthlyProfit(input: {
+  cars: Car[];
+  expensesByCar: Map<number, number>;
+  detailingNet: number;
+  documentTasks: DocumentTaskWithRelations[];
   today: string;
+}) {
+  const bounds = getDashboardPeriodBounds("month", input.today);
+  return computeCombinedPeriodProfit({
+    bounds,
+    cars: input.cars,
+    expensesByCar: input.expensesByCar,
+    detailingNet: input.detailingNet,
+    documentTasks: input.documentTasks,
+  });
+}
+
+export function buildProfitTrendSeries(input: {
+  rangeStart: string;
+  rangeEnd: string;
   cars: Car[];
   expensesByCar: Map<number, number>;
   detailingOrders: DetailingOrderWithServices[];
   detailingExpenses: DetailingExpenseRow[];
   documentTasks: DocumentTaskWithRelations[];
-  days?: number;
+  granularity?: ChartGranularity;
 }): ProfitTrendPoint[] {
-  const days = input.days ?? 30;
-  const startDate = addDays(input.today, -(days - 1));
-  const dates = buildDateRange(input.today, days);
-  const profitByDate = new Map<string, number>(
-    dates.map((date) => [date, 0])
+  const granularity =
+    input.granularity ??
+    getChartGranularity(
+      Math.max(
+        1,
+        Math.ceil(
+          (new Date(input.rangeEnd).getTime() - new Date(input.rangeStart).getTime()) /
+            (1000 * 60 * 60 * 24)
+        ) + 1
+      )
+    );
+  const bucketKeys = buildChartBucketKeys(
+    input.rangeStart,
+    input.rangeEnd,
+    granularity
   );
+  const profitByBucket = new Map<string, number>(
+    bucketKeys.map((key) => [key, 0])
+  );
+
+  function addProfit(date: string, amount: number) {
+    const bucket = bucketDateForChart(date, granularity);
+    if (!bucket || !profitByBucket.has(bucket)) return;
+    profitByBucket.set(bucket, (profitByBucket.get(bucket) ?? 0) + amount);
+  }
 
   for (const car of input.cars) {
     if (!isCarSold(car) || !shouldCountStatsProfit(car)) continue;
     const saleDate = (car.sale_date ?? car.updated_at)?.slice(0, 10);
-    if (!saleDate || saleDate < startDate || saleDate > input.today) continue;
+    if (!saleDate || saleDate < input.rangeStart || saleDate > input.rangeEnd) continue;
     const profit = calculateCarProfit(
       car,
       input.expensesByCar.get(car.id) ?? 0
     ).netProfit;
-    profitByDate.set(saleDate, (profitByDate.get(saleDate) ?? 0) + profit);
+    addProfit(saleDate, profit);
   }
 
   for (const order of input.detailingOrders) {
     if (order.status !== "delivered") continue;
     const date = deliveryDate(order);
-    if (!date || date < startDate || date > input.today) continue;
+    if (!date || date < input.rangeStart || date > input.rangeEnd) continue;
     const orderNet = order.final_price - resolveOrderCommissionTotal(order);
-    profitByDate.set(date, (profitByDate.get(date) ?? 0) + orderNet);
+    addProfit(date, orderNet);
   }
 
   for (const row of input.detailingExpenses) {
     const date = row.expense_date?.slice(0, 10);
-    if (!date || date < startDate || date > input.today) continue;
-    profitByDate.set(
-      date,
-      (profitByDate.get(date) ?? 0) - Number(row.amount ?? 0)
-    );
+    if (!date || date < input.rangeStart || date > input.rangeEnd) continue;
+    addProfit(date, -Number(row.amount ?? 0));
   }
 
   for (const task of input.documentTasks) {
-    const completedAt = task.completed_at?.slice(0, 10);
-    if (!completedAt || completedAt < startDate || completedAt > input.today) {
+    if (!isRecognizedDocumentTaskForFinance(task, { start: input.rangeStart, end: input.rangeEnd })) {
       continue;
     }
-    profitByDate.set(
-      completedAt,
-      (profitByDate.get(completedAt) ?? 0) + computeDocumentTaskProfit(task)
-    );
+    const completedAt = task.completed_at?.slice(0, 10);
+    if (!completedAt) continue;
+    addProfit(completedAt, computeDocumentTaskProfit(task));
   }
 
-  return dates.map((date) => ({
+  return bucketKeys.map((date) => ({
     date,
-    profit: roundMoney(profitByDate.get(date) ?? 0),
+    profit: roundMoney(profitByBucket.get(date) ?? 0),
   }));
 }
 
 export function buildProfitDirectionBars(input: {
-  today: string;
+  bounds: DashboardPeriodBounds;
   cars: Car[];
   expensesByCar: Map<number, number>;
   detailingNet: number;
   documentTasks: DocumentTaskWithRelations[];
 }): ProfitDirectionBar[] {
-  const bounds = getDashboardPeriodBounds("month", input.today);
+  if (!input.bounds.start || !input.bounds.end) return [];
+  const bounds = input.bounds;
   let ownedProfit = 0;
   let commissionProfit = 0;
   let hasOwned = false;
@@ -197,8 +240,7 @@ export function buildProfitDirectionBars(input: {
   }
 
   for (const task of input.documentTasks) {
-    const completedAt = task.completed_at?.slice(0, 10);
-    if (!completedAt || completedAt < bounds.start! || completedAt > bounds.end!) {
+    if (!isRecognizedDocumentTaskForFinance(task, bounds)) {
       continue;
     }
     const finance = getDocumentFinanceSummary(task);

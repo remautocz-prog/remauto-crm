@@ -12,12 +12,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 type DashboardPageProps = {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{
+    from?: string;
+    to?: string;
+    preset?: string;
+    period?: string;
+  }>;
 };
 
 async function DashboardContent({ searchParams }: DashboardPageProps) {
+  const params = await searchParams;
   const [data, user] = await Promise.all([
-    getOwnerDashboardData("month"),
+    getOwnerDashboardData(params),
     getCurrentUser(),
   ]);
 

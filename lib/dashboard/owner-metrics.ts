@@ -15,11 +15,7 @@ import {
 import { computeDocumentWorkloadSummary } from "@/lib/documents/summary";
 import { getPragueTodayDateString } from "@/lib/documents/deadline";
 import type { Car } from "@/lib/types/cars";
-import type {
-  OwnerAttentionItem,
-  OwnerTopCards,
-} from "@/lib/types/owner-dashboard";
-import type { DetailingOrderWithServices } from "@/lib/types/detailing";
+import type { OwnerTopCards } from "@/lib/types/owner-dashboard";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 
 const CAR_ACTIVE_STATUSES = [
@@ -36,6 +32,7 @@ function isCarActive(car: Car) {
 
 export function computeOwnerTopCards(input: {
   monthlyProfit: number;
+  documentsProfit: number;
   cars: Car[];
   tasks: DocumentTaskWithRelations[];
   detailingOrdersToday: number;
@@ -66,97 +63,13 @@ export function computeOwnerTopCards(input: {
 
   return {
     monthlyProfit: input.monthlyProfit,
+    documentsProfit: input.documentsProfit,
     carsInStock,
     commissionCarsInStock,
     documentsInProgress,
     detailingOrdersToday: input.detailingOrdersToday,
     attentionCount: input.attentionCount,
   };
-}
-
-export function computeOwnerAttentionItems(input: {
-  cars: Car[];
-  tasks: DocumentTaskWithRelations[];
-  detailingOrders: DetailingOrderWithServices[];
-  today: string;
-}): OwnerAttentionItem[] {
-  const items: OwnerAttentionItem[] = [];
-
-  const documentsOverdue = input.tasks.filter(
-    (task) =>
-      !task.archived_at &&
-      isTaskActiveForDeadline(task) &&
-      isTaskOverdue(task, input.today)
-  ).length;
-  if (documentsOverdue > 0) {
-    items.push({
-      id: "documents-overdue",
-      labelKey: "attentionDocumentsOverdue",
-      count: documentsOverdue,
-      href: "/documents?deadline=overdue",
-      severity: "critical",
-    });
-  }
-
-  const detailingUnpaid = input.detailingOrders.filter(
-    (order) =>
-      order.status === "delivered" &&
-      (order.payment_status === "unpaid" ||
-        order.payment_status === "partially_paid")
-  ).length;
-  if (detailingUnpaid > 0) {
-    items.push({
-      id: "detailing-unpaid",
-      labelKey: "attentionDetailingUnpaid",
-      count: detailingUnpaid,
-      href: "/detailing/orders?payment=unpaid",
-      severity: "warning",
-    });
-  }
-
-  const detailingReady = input.detailingOrders.filter(
-    (order) => order.status === "ready"
-  ).length;
-  if (detailingReady > 0) {
-    items.push({
-      id: "detailing-ready",
-      labelKey: "attentionDetailingReady",
-      count: detailingReady,
-      href: "/detailing/orders?status=ready",
-      severity: "info",
-    });
-  }
-
-  const soldMissingPrice = input.cars.filter(
-    (car) =>
-      car.status === "sold" &&
-      (car.actual_sale_price == null || Number(car.actual_sale_price) <= 0)
-  ).length;
-  if (soldMissingPrice > 0) {
-    items.push({
-      id: "sold-missing-price",
-      labelKey: "attentionSoldMissingPrice",
-      count: soldMissingPrice,
-      href: "/cars?status=sold",
-      severity: "warning",
-    });
-  }
-
-  const activeMissingSalePrice = input.cars.filter((car) => {
-    if (!isCarActive(car) || isCarSold(car)) return false;
-    return car.sale_price == null || Number(car.sale_price) <= 0;
-  }).length;
-  if (activeMissingSalePrice > 0) {
-    items.push({
-      id: "active-missing-sale-price",
-      labelKey: "attentionActiveMissingSalePrice",
-      count: activeMissingSalePrice,
-      href: "/cars?status=in_stock",
-      severity: "warning",
-    });
-  }
-
-  return items;
 }
 
 export function sortOverdueTasks(

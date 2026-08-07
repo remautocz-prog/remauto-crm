@@ -94,6 +94,22 @@ export function compareDeadlineLatest(
   return bDue.localeCompare(aDue);
 }
 
+export function getOverdueDayCount(
+  task: Pick<DocumentTask, "due_date" | "deadline" | "status">,
+  today = getPragueTodayDateString()
+): number {
+  const due = getTaskDueDate(task);
+  if (!due || !isTaskActiveForDeadline(task) || due >= today) {
+    return 0;
+  }
+
+  const [dueYear, dueMonth, dueDay] = due.split("-").map(Number);
+  const [todayYear, todayMonth, todayDay] = today.split("-").map(Number);
+  const dueMs = Date.UTC(dueYear, dueMonth - 1, dueDay);
+  const todayMs = Date.UTC(todayYear, todayMonth - 1, todayDay);
+  return Math.floor((todayMs - dueMs) / 86_400_000);
+}
+
 export const DEADLINE_STATE_STYLES: Record<DeadlineState, string> = {
   overdue: "text-red-400 font-medium",
   due_today: "text-orange-400 font-medium",

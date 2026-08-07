@@ -8,12 +8,13 @@ import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import type { NavItem } from "@/lib/navigation";
 
-function Brand() {
+function Brand({ homeHref }: { homeHref: string }) {
   const t = useTranslations("app");
 
   return (
-    <div className="flex items-center gap-2">
+    <Link href={homeHref} className="flex items-center gap-2">
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-sm font-bold text-white">
         R
       </div>
@@ -21,25 +22,35 @@ function Brand() {
         <p className="text-sm font-semibold text-white">RemAuto</p>
         <p className="text-xs text-zinc-500">{t("tagline")}</p>
       </div>
-    </div>
+    </Link>
   );
 }
 
-export function DesktopSidebar() {
+export function DesktopSidebar({
+  navItems,
+  homeHref = "/dashboard",
+}: {
+  navItems: NavItem[];
+  homeHref?: string;
+}) {
   return (
     <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 lg:fixed lg:flex">
       <div className="flex h-16 items-center px-6">
-        <Link href="/dashboard">
-          <Brand />
-        </Link>
+        <Brand homeHref={homeHref} />
       </div>
       <Separator />
-      <SidebarNav />
+      <SidebarNav navItems={navItems} />
     </aside>
   );
 }
 
-export function MobileSidebar() {
+export function MobileSidebar({
+  navItems,
+  homeHref = "/dashboard",
+}: {
+  navItems: NavItem[];
+  homeHref?: string;
+}) {
   const [open, setOpen] = useState(false);
   const t = useTranslations("a11y");
 
@@ -53,10 +64,13 @@ export function MobileSidebar() {
       </SheetTrigger>
       <SheetContent side="left" className="w-72 p-0">
         <div className="flex h-16 items-center px-6">
-          <Brand />
+          <Brand homeHref={homeHref} />
         </div>
         <Separator />
-        <SidebarNav onNavigate={() => setOpen(false)} />
+        <SidebarNav
+          navItems={navItems}
+          onNavigate={() => setOpen(false)}
+        />
       </SheetContent>
     </Sheet>
   );

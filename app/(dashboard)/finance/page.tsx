@@ -4,7 +4,12 @@ import { FinanceCenterView } from "@/components/finance/finance-center-view";
 import { getFinanceCenterData } from "@/lib/queries/finance-center";
 
 type FinancePageProps = {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{
+    from?: string;
+    to?: string;
+    preset?: string;
+    period?: string;
+  }>;
 };
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -13,8 +18,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function FinancePage({ searchParams }: FinancePageProps) {
-  const { period } = await searchParams;
-  const data = await getFinanceCenterData(period);
+  const params = await searchParams;
+  const data = await getFinanceCenterData(params);
 
   return <FinanceCenterView data={data} />;
 }

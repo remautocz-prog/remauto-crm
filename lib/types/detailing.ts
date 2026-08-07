@@ -72,6 +72,7 @@ export type DetailingOrder = {
   remaining_amount: number;
   payment_status: DetailingPaymentStatus;
   archived_at: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -172,6 +173,38 @@ export type DetailingDashboardStats = {
   monthCommissions: number;
   monthExpenses: number;
   monthNetResult: number;
+};
+
+export type DetailingEmployeeDashboardKpis = {
+  myTasksToday: number;
+  inProgress: number;
+  ready: number;
+  myEarnedCommission: number;
+  unpaidOrders: number;
+};
+
+export type DetailingEmployeeDashboardOrder = {
+  order: DetailingOrderWithServices;
+  myCommission: number;
+  myServices: DetailingOrderService[];
+};
+
+export type DetailingEmployeeDashboardData = {
+  employeeId: string;
+  employeeName: string;
+  viewerName: string;
+  canSelectEmployee: boolean;
+  assigneeOptions: Array<{ id: string; full_name: string }>;
+  dateRange: {
+    from: string;
+    to: string;
+    preset: string;
+  };
+  today: string;
+  kpis: DetailingEmployeeDashboardKpis;
+  todayOrders: DetailingEmployeeDashboardOrder[];
+  attentionOrders: DetailingEmployeeDashboardOrder[];
+  earnedOrders: DetailingEmployeeDashboardOrder[];
 };
 
 export type DetailingEmployeeMonthStats = {

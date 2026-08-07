@@ -1,6 +1,6 @@
-import { DesktopSidebar } from "@/components/layout/app-sidebar";
-import { TopNav } from "@/components/layout/top-nav";
-import { getCurrentUser } from "@/lib/queries/dashboard";
+import { getCurrentUserAccess } from "@/lib/auth/access";
+import { getNavItemsForRole } from "@/lib/auth/navigation";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -10,22 +10,29 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
+  const access = await getCurrentUserAccess();
 
-  if (!user) {
+  if (!access) {
     redirect("/login");
   }
 
+  if (!access.isActive) {
+    redirect("/access-disabled");
+  }
+
+  const activeAccess = access;
+  const navItems = getNavItemsForRole(activeAccess.role);
+
   return (
-    <div className="min-h-screen bg-black">
-      <DesktopSidebar />
-      <div className="flex min-h-screen flex-col lg:pl-64">
-        <TopNav
-          email={user.email ?? "user@remauto.com"}
-          avatarUrl={user.user_metadata?.avatar_url}
-        />
-        <main className="flex-1 p-4 lg:p-8">{children}</main>
-      </div>
-    </div>
+    <DashboardShell
+      email={activeAccess.email ?? "user@remauto.com"}
+      avatarUrl={undefined}
+      navItems={navItems}
+      role={activeAccess.role}
+      canManageUsers={activeAccess.permissions.has("users.view")}
+      canViewSettings={activeAccess.permissions.has("settings.view")}
+    >
+      {children}
+    </DashboardShell>
   );
 }

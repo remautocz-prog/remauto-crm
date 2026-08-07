@@ -3,6 +3,7 @@ import {
   sumDeliveredOrderCommissions,
 } from "@/lib/detailing/finance-aggregation";
 import { roundMoney } from "@/lib/detailing/pricing";
+import type { DetailingFinanceReport } from "@/lib/types/detailing";
 import type { DetailingOrderWithServices } from "@/lib/types/detailing";
 
 export type DetailingFinanceSummary = {
@@ -12,6 +13,29 @@ export type DetailingFinanceSummary = {
   expenses: number;
   netResult: number;
 };
+
+export const EMPTY_DETAILING_FINANCE_SUMMARY: DetailingFinanceSummary = {
+  orderCount: 0,
+  revenue: 0,
+  commissions: 0,
+  expenses: 0,
+  netResult: 0,
+};
+
+export function mapDetailingFinanceReportToSummary(
+  report: Pick<
+    DetailingFinanceReport,
+    "orderCount" | "deliveredRevenue" | "employeeCommissions" | "expenses" | "netResult"
+  >
+): DetailingFinanceSummary {
+  return {
+    orderCount: report.orderCount,
+    revenue: report.deliveredRevenue,
+    commissions: report.employeeCommissions,
+    expenses: report.expenses,
+    netResult: report.netResult,
+  };
+}
 
 export function computeDetailingFinanceSummary(
   orders: DetailingOrderWithServices[],

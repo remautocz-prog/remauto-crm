@@ -43,14 +43,12 @@ export function DashboardHeader({ userName, title }: DashboardHeaderProps) {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">
-            {title ?? (userName ? `${t("welcome")}, ${userName}` : t("dashboardOverview"))}
-          </h2>
-          <p className="text-sm text-zinc-400">{formatDate(today)}</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-white">
+          {title ?? (userName ? `${t("welcome")}, ${userName}` : t("dashboardOverview"))}
+        </h2>
+        <p className="mt-1 text-sm text-zinc-400">{formatDate(today)}</p>
       </div>
 
       <div>

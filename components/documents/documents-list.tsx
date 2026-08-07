@@ -15,6 +15,11 @@ import {
   DOCUMENT_TASK_STATUS_VALUES,
   type DocumentSortValue,
 } from "@/lib/constants/documents";
+import {
+  DOCUMENT_LIST_SEGMENTS,
+  type DocumentListSegment,
+  segmentUsesKanban,
+} from "@/lib/documents/list-segment";
 import { getAllFilterableServiceCodes } from "@/lib/documents/services";
 import { getDocumentVehicleTitle } from "@/lib/documents/vehicle";
 import { getClientDisplayName } from "@/lib/clients/validation";
@@ -29,6 +34,9 @@ import { DocumentInlinePrioritySelect } from "@/components/documents/document-in
 import { DocumentInlineAssigneeSelect } from "@/components/documents/document-inline-assignee-select";
 import { DocumentInlineDeadlineEditor } from "@/components/documents/document-inline-deadline-editor";
 import { DocumentInlineStatusSelect, type DocumentListToast } from "@/components/documents/document-inline-status-select";
+import { DocumentArchivedBadge } from "@/components/documents/document-archived-badge";
+import { DocumentArchiveRestoreButton } from "@/components/documents/document-archive-restore-button";
+import { DocumentStatusBadge } from "@/components/documents/document-status-badge";
 import { DOCUMENT_PRIORITY_ROW_ACCENT, normalizeDocumentPriority } from "@/lib/documents/priority-styles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,9 +97,12 @@ type DocumentsListProps = {
   initialDueThisWeek: boolean;
   initialNoDeadline: boolean;
   initialUnassignedOnly: boolean;
-  initialArchived: boolean;
+  initialSegment: DocumentListSegment;
   initialSort: string;
   initialView: "table" | "kanban";
+  showArchiveMetadata: boolean;
+  canRestoreArchived: boolean;
+  canArchive: boolean;
   initialClientId?: number | null;
   initialCarId?: number | null;
 };
@@ -129,9 +140,11 @@ export function DocumentsList(props: DocumentsListProps) {
   const [dueThisWeek, setDueThisWeek] = useState(props.initialDueThisWeek);
   const [noDeadline, setNoDeadline] = useState(props.initialNoDeadline);
   const [unassignedOnly, setUnassignedOnly] = useState(props.initialUnassignedOnly);
-  const [archived, setArchived] = useState(props.initialArchived);
+  const [segment, setSegment] = useState<DocumentListSegment>(props.initialSegment);
   const [sort, setSort] = useState(props.initialSort);
-  const [view, setView] = useState<"table" | "kanban">(props.initialView);
+  const [view, setView] = useState<"table" | "kanban">(
+    segmentUsesKanban(props.initialSegment) ? props.initialView : "table"
+  );
   const [statusOverrides, setStatusOverrides] = useState<Record<number, string>>({});
   const [priorityOverrides, setPriorityOverrides] = useState<Record<number, string>>({});
   const [assigneeOverrides, setAssigneeOverrides] = useState<
@@ -205,7 +218,7 @@ export function DocumentsList(props: DocumentsListProps) {
   const tPayment = useTranslations("documents.paymentStatus");
   const tStatus = useTranslations("documents.status");
   const tCommon = useTranslations("common");
-  const { formatCurrency, formatDate } = useFormatters();
+  const { formatCurrency, formatDate, formatDateTime } = useFormatters();
   const dash = tCommon("dash");
 
   function applyFilters(next: Partial<Record<string, string | boolean>>) {
@@ -222,12 +235,13 @@ export function DocumentsList(props: DocumentsListProps) {
       due_this_week: Boolean(next.due_this_week ?? dueThisWeek),
       no_deadline: Boolean(next.no_deadline ?? noDeadline),
       unassigned_only: Boolean(next.unassigned_only ?? unassignedOnly),
-      archived: Boolean(next.archived ?? archived),
+      segment: String(next.segment ?? segment) as DocumentListSegment,
       sort: String(next.sort ?? sort),
       view: String(next.view ?? view),
     };
 
     if (values.q.trim()) params.set("q", values.q.trim());
+    if (values.segment !== "active") params.set("segment", values.segment);
     if (values.status !== "all") params.set("status", values.status);
     if (values.priority !== "all") params.set("priority", values.priority);
     if (values.service_type !== "all") params.set("service_type", values.service_type);
@@ -238,9 +252,8 @@ export function DocumentsList(props: DocumentsListProps) {
     if (values.due_this_week) params.set("due_this_week", "1");
     if (values.no_deadline) params.set("no_deadline", "1");
     if (values.unassigned_only) params.set("unassigned_only", "1");
-    if (values.archived) params.set("archived", "1");
     if (values.sort !== "newest") params.set("sort", values.sort);
-    if (values.view !== "table") params.set("view", values.view);
+    if (values.segment === "active" && values.view !== "table") params.set("view", values.view);
     if (props.initialClientId) params.set("client_id", String(props.initialClientId));
 
     startTransition(() => {
@@ -260,12 +273,12 @@ export function DocumentsList(props: DocumentsListProps) {
     setDueThisWeek(false);
     setNoDeadline(false);
     setUnassignedOnly(false);
-    setArchived(false);
+    setSegment("active");
     setSort("newest");
+    setView("table");
     startTransition(() => {
       const params = new URLSearchParams();
       if (props.initialClientId) params.set("client_id", String(props.initialClientId));
-      if (view !== "table") params.set("view", view);
       router.push(`/documents${params.toString() ? `?${params.toString()}` : ""}`);
     });
   }
@@ -284,11 +297,14 @@ export function DocumentsList(props: DocumentsListProps) {
           props.initialDueThisWeek ||
           props.initialNoDeadline ||
           props.initialUnassignedOnly ||
-          props.initialArchived ||
+          props.initialSegment !== "active" ||
           props.initialSort !== "newest"
       ),
     [props]
   );
+
+  const isArchivedView = segment === "archived";
+  const isReadOnlyRow = isArchivedView;
 
   return (
     <div className="space-y-6">
@@ -320,6 +336,7 @@ export function DocumentsList(props: DocumentsListProps) {
             <List className="h-4 w-4" />
             {t("tableView")}
           </Button>
+          {segmentUsesKanban(segment) ? (
           <Button
             variant={view === "kanban" ? "default" : "secondary"}
             onClick={() => {
@@ -330,11 +347,29 @@ export function DocumentsList(props: DocumentsListProps) {
             <LayoutGrid className="h-4 w-4" />
             {t("kanbanView")}
           </Button>
+          ) : null}
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             {t("createTask")}
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {DOCUMENT_LIST_SEGMENTS.map((value) => (
+          <Button
+            key={value}
+            variant={segment === value ? "default" : "secondary"}
+            onClick={() => {
+              setSegment(value);
+              const nextView = segmentUsesKanban(value) ? view : "table";
+              if (!segmentUsesKanban(value)) setView("table");
+              applyFilters({ segment: value, view: nextView });
+            }}
+          >
+            {t(`segment.${value}` as "segment.active")}
+          </Button>
+        ))}
       </div>
 
       <Card className="border-zinc-800 bg-zinc-900/60">
@@ -411,6 +446,12 @@ export function DocumentsList(props: DocumentsListProps) {
               {t("urgentOnly")}
             </label>
             <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={unassignedOnly} onChange={(e) => { setUnassignedOnly(e.target.checked); applyFilters({ unassigned_only: e.target.checked }); }} />
+              {t("unassignedOnly")}
+            </label>
+            {!isArchivedView ? (
+              <>
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
               <input type="checkbox" checked={overdue} onChange={(e) => { setOverdue(e.target.checked); applyFilters({ overdue: e.target.checked }); }} />
               {t("overdueOnly")}
             </label>
@@ -426,14 +467,8 @@ export function DocumentsList(props: DocumentsListProps) {
               <input type="checkbox" checked={noDeadline} onChange={(e) => { setNoDeadline(e.target.checked); applyFilters({ no_deadline: e.target.checked }); }} />
               {t("noDeadline")}
             </label>
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input type="checkbox" checked={unassignedOnly} onChange={(e) => { setUnassignedOnly(e.target.checked); applyFilters({ unassigned_only: e.target.checked }); }} />
-              {t("unassignedOnly")}
-            </label>
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input type="checkbox" checked={archived} onChange={(e) => { setArchived(e.target.checked); applyFilters({ archived: e.target.checked }); }} />
-              {t("archivedOnly")}
-            </label>
+              </>
+            ) : null}
             <Button variant="secondary" onClick={() => applyFilters({ q: query })} disabled={isPending}>
               {isPending ? <Loader2 className="animate-spin" /> : null}
               {tActions("applyFilters")}
@@ -464,7 +499,7 @@ export function DocumentsList(props: DocumentsListProps) {
             ) : null}
           </CardContent>
         </Card>
-      ) : view === "kanban" ? (
+      ) : view === "kanban" && segmentUsesKanban(segment) ? (
         <DocumentsKanban tasks={props.tasks} />
       ) : (
         <>
@@ -481,11 +516,22 @@ export function DocumentsList(props: DocumentsListProps) {
                   <th className="px-4 py-3 font-medium">{t("priorityLabel")}</th>
                   <th className="px-4 py-3 font-medium">{t("startDate")}</th>
                   <th className="px-4 py-3 font-medium">{t("deadline")}</th>
+                  {props.showArchiveMetadata && isArchivedView ? (
+                    <>
+                      <th className="px-4 py-3 font-medium">{t("archivedAt")}</th>
+                      <th className="px-4 py-3 font-medium">{t("archivedBy")}</th>
+                    </>
+                  ) : null}
                   <th className="px-4 py-3 font-medium">{t("totalPrice")}</th>
                   <th className="px-4 py-3 font-medium">{t("paidAmount")}</th>
                   <th className="px-4 py-3 font-medium">{t("debt")}</th>
                   <th className="px-4 py-3 font-medium">{t("paymentStatusLabel")}</th>
-                  <th className="px-4 py-3 font-medium">{t("quickPaid")}</th>
+                  {!isReadOnlyRow ? (
+                    <th className="px-4 py-3 font-medium">{t("quickPaid")}</th>
+                  ) : null}
+                  {isArchivedView && props.canRestoreArchived ? (
+                    <th className="px-4 py-3 font-medium">{t("restoreTask")}</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -500,9 +546,12 @@ export function DocumentsList(props: DocumentsListProps) {
                   return (
                     <tr key={task.id} className={cn("border-t border-zinc-800/80 hover:bg-zinc-900/50", getRowAccentClass(task))}>
                       <td className="px-4 py-3">
-                        <Link href={`/documents/${task.id}`} className="font-medium text-white hover:text-red-400">
-                          #{task.id}
-                        </Link>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link href={`/documents/${task.id}`} className="font-medium text-white hover:text-red-400">
+                            #{task.id}
+                          </Link>
+                          {isArchivedView ? <DocumentArchivedBadge /> : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-zinc-300">
                         {task.client ? (
@@ -516,6 +565,9 @@ export function DocumentsList(props: DocumentsListProps) {
                         {getServicesSummary(task, formatCurrency, t)}
                       </td>
                       <td className="px-4 py-3">
+                        {isReadOnlyRow ? (
+                          <span className="text-zinc-300">{assignee?.full_name ?? t("unassigned")}</span>
+                        ) : (
                         <DocumentInlineAssigneeSelect
                           key={`assignee-${task.id}-${assignee?.id ?? "none"}-${assignee?.full_name ?? ""}`}
                           taskId={task.id}
@@ -525,25 +577,37 @@ export function DocumentsList(props: DocumentsListProps) {
                           onAssignmentChange={handleAssignmentChange}
                           onToast={showToast}
                         />
+                        )}
                       </td>
                       <td className="px-4 py-3">
+                        {isReadOnlyRow ? (
+                          <DocumentStatusBadge status={getTaskStatus(task)} />
+                        ) : (
                         <DocumentInlineStatusSelect
                           taskId={task.id}
                           status={getTaskStatus(task)}
                           onStatusChange={handleStatusChange}
                           onToast={showToast}
                         />
+                        )}
                       </td>
                       <td className="px-4 py-3">
+                        {isReadOnlyRow ? (
+                          <span className="text-zinc-300">{tPriority(getTaskPriority(task) as "low")}</span>
+                        ) : (
                         <DocumentInlinePrioritySelect
                           taskId={task.id}
                           priority={getTaskPriority(task)}
                           onPriorityChange={handlePriorityChange}
                           onToast={showToast}
                         />
+                        )}
                       </td>
                       <td className="px-4 py-3 text-zinc-300">{formatDate(task.started_at, dash)}</td>
                       <td className="px-4 py-3">
+                        {isReadOnlyRow ? (
+                          <span className="text-zinc-300">{formatDate(getTaskDeadline(task), dash)}</span>
+                        ) : (
                         <DocumentInlineDeadlineEditor
                           key={`deadline-${task.id}-${getTaskDeadline(task) ?? "none"}`}
                           taskId={task.id}
@@ -551,16 +615,34 @@ export function DocumentsList(props: DocumentsListProps) {
                           onDeadlineChange={handleDeadlineChange}
                           onToast={showToast}
                         />
+                        )}
                       </td>
+                      {props.showArchiveMetadata && isArchivedView ? (
+                        <>
+                          <td className="px-4 py-3 text-zinc-300">
+                            {formatDateTime(task.archived_at, dash)}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-300">
+                            {task.archiver?.full_name ?? dash}
+                          </td>
+                        </>
+                      ) : null}
                       <td className="px-4 py-3 text-zinc-300">{formatCurrency(finance.servicePrice)}</td>
                       <td className="px-4 py-3 text-zinc-300">{formatCurrency(finance.paidAmount)}</td>
                       <td className="px-4 py-3 text-zinc-300">{formatCurrency(finance.outstandingBalance)}</td>
                       <td className="px-4 py-3">
                         <DocumentPaymentStatusBadge status={finance.paymentStatus} />
                       </td>
+                      {!isReadOnlyRow ? (
                       <td className="px-4 py-3">
                         <DocumentQuickPayControl task={task} />
                       </td>
+                      ) : null}
+                      {isArchivedView && props.canRestoreArchived ? (
+                        <td className="px-4 py-3">
+                          <DocumentArchiveRestoreButton taskId={task.id} compact />
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
@@ -581,9 +663,12 @@ export function DocumentsList(props: DocumentsListProps) {
                 <Card key={task.id} className={cn("border-zinc-800 bg-zinc-900/60", getRowAccentClass(task))}>
                   <CardHeader>
                     <CardTitle className="text-base text-white">
-                      <Link href={`/documents/${task.id}`} className="hover:text-red-400">
-                        #{task.id}
-                      </Link>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={`/documents/${task.id}`} className="hover:text-red-400">
+                          #{task.id}
+                        </Link>
+                        {isArchivedView ? <DocumentArchivedBadge /> : null}
+                      </div>
                       <div className="mt-1 text-sm font-normal text-zinc-400">
                         {getServicesSummary(task, formatCurrency, t)}
                       </div>
@@ -591,6 +676,13 @@ export function DocumentsList(props: DocumentsListProps) {
                   </CardHeader>
                   <CardContent className="grid gap-2 text-sm text-zinc-300">
                     <div className="flex flex-wrap items-center gap-2">
+                      {isReadOnlyRow ? (
+                        <>
+                          <DocumentStatusBadge status={getTaskStatus(task)} />
+                          <span className="text-zinc-400">{tPriority(getTaskPriority(task) as "low")}</span>
+                        </>
+                      ) : (
+                        <>
                       <DocumentInlineStatusSelect
                         taskId={task.id}
                         status={getTaskStatus(task)}
@@ -605,10 +697,15 @@ export function DocumentsList(props: DocumentsListProps) {
                         onToast={showToast}
                         className="min-w-0 w-full sm:w-auto"
                       />
+                        </>
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-zinc-500">{t("responsibleEmployee")}</span>
+                        {isReadOnlyRow ? (
+                          <span>{assignee?.full_name ?? t("unassigned")}</span>
+                        ) : (
                         <DocumentInlineAssigneeSelect
                           key={`assignee-mobile-${task.id}-${assignee?.id ?? "none"}-${assignee?.full_name ?? ""}`}
                           taskId={task.id}
@@ -619,9 +716,13 @@ export function DocumentsList(props: DocumentsListProps) {
                           onToast={showToast}
                           className="max-w-[14rem]"
                         />
+                        )}
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-zinc-500">{t("deadline")}</span>
+                        {isReadOnlyRow ? (
+                          <span>{formatDate(getTaskDeadline(task), dash)}</span>
+                        ) : (
                         <DocumentInlineDeadlineEditor
                           key={`deadline-mobile-${task.id}-${getTaskDeadline(task) ?? "none"}`}
                           taskId={task.id}
@@ -630,11 +731,28 @@ export function DocumentsList(props: DocumentsListProps) {
                           onToast={showToast}
                           className="max-w-[14rem]"
                         />
+                        )}
                       </div>
                     </div>
+                    {props.showArchiveMetadata && isArchivedView ? (
+                      <>
+                        <div className="flex justify-between gap-3">
+                          <span className="text-zinc-500">{t("archivedAt")}</span>
+                          <span>{formatDateTime(task.archived_at, dash)}</span>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <span className="text-zinc-500">{t("archivedBy")}</span>
+                          <span>{task.archiver?.full_name ?? dash}</span>
+                        </div>
+                      </>
+                    ) : null}
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <DocumentPaymentStatusBadge status={finance.paymentStatus} />
-                      <DocumentQuickPayControl task={task} compact />
+                      {!isReadOnlyRow ? (
+                        <DocumentQuickPayControl task={task} compact />
+                      ) : props.canRestoreArchived ? (
+                        <DocumentArchiveRestoreButton taskId={task.id} compact />
+                      ) : null}
                     </div>
                     <div className="flex justify-between gap-3">
                       <span className="text-zinc-500">{tFields("client")}</span>

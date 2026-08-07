@@ -26,12 +26,15 @@ import type {
   PowerOfAttorneyVehicleInput,
 } from "@/lib/types/power-of-attorney";
 import type { ActionResult } from "@/lib/utils/errors";
+import { guardPermission } from "@/lib/auth/action-guard";
 import { getTranslations } from "next-intl/server";
 
 export async function buildPowerOfAttorneyPreviewAction(input: {
   language: DocumentTemplateLanguage;
   form: PowerOfAttorneyFormInput;
 }): Promise<ActionResult<{ data: DocumentTemplateData }>> {
+  const denied = await guardPermission<{ data: DocumentTemplateData }>("documents.create");
+  if (denied) return denied;
   const supabase = await createClient();
   const {
     data: { user },
@@ -59,6 +62,8 @@ export async function buildPowerOfAttorneyPreviewAction(input: {
 }
 
 export async function getPowerOfAttorneyDealVehiclesAction(dealId: string) {
+  const denied = await guardPermission("documents.view");
+  if (denied) return [];
   const supabase = await createClient();
   const {
     data: { user },
@@ -91,6 +96,11 @@ export async function loadPowerOfAttorneyAutofillAction(input: {
     vehicle?: Partial<PowerOfAttorneyVehicleInput>;
   }>
 > {
+  const denied = await guardPermission<{
+    party?: Partial<PowerOfAttorneyPartyInput>;
+    vehicle?: Partial<PowerOfAttorneyVehicleInput>;
+  }>("documents.view");
+  if (denied) return denied;
   const supabase = await createClient();
   const {
     data: { user },
@@ -139,6 +149,8 @@ export async function loadPowerOfAttorneyAutofillAction(input: {
 }
 
 export async function searchPowerOfAttorneyVehiclesAction(query: string) {
+  const denied = await guardPermission("documents.view");
+  if (denied) return [];
   const supabase = await createClient();
   const {
     data: { user },
@@ -167,6 +179,8 @@ export async function searchPowerOfAttorneyVehiclesAction(query: string) {
 }
 
 export async function searchPowerOfAttorneyClientsAction(query: string) {
+  const denied = await guardPermission("documents.view");
+  if (denied) return [];
   const supabase = await createClient();
   const {
     data: { user },

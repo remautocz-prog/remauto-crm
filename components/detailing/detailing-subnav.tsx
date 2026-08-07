@@ -5,20 +5,31 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { DetailingNavKey } from "@/lib/auth/navigation";
 
-const links = [
-  { href: "/detailing", key: "dashboard" as const, exact: true },
-  { href: "/detailing/orders", key: "orders" as const },
-  { href: "/detailing/orders/new", key: "newOrder" as const, highlight: true },
-  { href: "/detailing/finance", key: "finance" as const },
-  { href: "/detailing/expenses", key: "expenses" as const },
-  { href: "/detailing/employees", key: "employees" as const },
-  { href: "/detailing/services", key: "services" as const },
+const links: Array<{
+  href: string;
+  key: DetailingNavKey;
+  exact?: boolean;
+  highlight?: boolean;
+}> = [
+  { href: "/detailing", key: "dashboard", exact: true },
+  { href: "/detailing/orders", key: "orders" },
+  { href: "/detailing/orders/new", key: "newOrder", highlight: true },
+  { href: "/detailing/finance", key: "finance" },
+  { href: "/detailing/expenses", key: "expenses" },
+  { href: "/detailing/employees", key: "employees" },
+  { href: "/detailing/services", key: "services" },
 ];
 
-export function DetailingSubnav() {
+export function DetailingSubnav({
+  allowedNavKeys,
+}: {
+  allowedNavKeys: DetailingNavKey[];
+}) {
   const pathname = usePathname();
   const t = useTranslations("detailing.nav");
+  const visibleLinks = links.filter((link) => allowedNavKeys.includes(link.key));
 
   return (
     <div className="space-y-4">
@@ -33,7 +44,7 @@ export function DetailingSubnav() {
       </div>
 
       <nav className="flex flex-wrap gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/40 p-1.5">
-        {links.map((link) => {
+        {visibleLinks.map((link) => {
           const active = link.exact
             ? pathname === link.href
             : link.href === "/detailing/orders"

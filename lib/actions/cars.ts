@@ -16,11 +16,13 @@ import {
 } from "@/lib/constants/cars";
 import { CAR_STATUS_SOLD } from "@/lib/constants/status";
 import { createClient } from "@/lib/supabase/server";
+import { insertIdentityReturningId } from "@/lib/supabase/safe-insert";
 import type { Car, CarExpenseInput, CarFormInput } from "@/lib/types/cars";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
 import { getDetailingOrderById } from "@/lib/queries/detailing";
 import { getCarExpenseByDetailingOrderId } from "@/lib/queries/cars";
 import { buildServicesSummary } from "@/lib/detailing/validation";
+import { guardPermission, guardPermanentDelete } from "@/lib/auth/action-guard";
 
 async function mapValidationIssuesToFieldErrors(
   issues: ReturnType<typeof collectCarValidationIssues>
@@ -68,17 +70,19 @@ function validationFailure<T>(fieldErrors: CarFieldErrors): ActionResult<T> {
 export async function createCarAction(
   input: CarFormInput
 ): Promise<ActionResult<{ id: number }>> {
+  const denied = await guardPermission<{ id: number }>("cars.create");
+  if (denied) return denied;
   const fieldErrors = await validateCarInput(input);
   if (fieldErrors) return validationFailure(fieldErrors);
 
   const payload = normalizeCarPayload(input);
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("cars")
-    .insert(payload as Record<string, unknown>)
-    .select("id")
-    .single();
+  const { id, error } = await insertIdentityReturningId(
+    supabase,
+    "cars",
+    payload as Record<string, unknown>
+  );
 
   if (error) {
     console.error("[createCarAction] Supabase insert failed:", {
@@ -94,13 +98,15 @@ export async function createCarAction(
   revalidatePath("/cars");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
-  return { success: true, data: { id: data.id } };
+  return { success: true, data: { id } };
 }
 
 export async function updateCarAction(
   id: number,
   input: CarFormInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("cars.update");
+  if (denied) return denied;
   const fieldErrors = await validateCarInput(input);
   if (fieldErrors) return validationFailure(fieldErrors);
 
@@ -134,6 +140,8 @@ export async function markCarSoldAction(
   id: number,
   input: Pick<CarFormInput, "actual_sale_price" | "sale_date" | "client_id">
 ): Promise<ActionResult> {
+  const denied = await guardPermission("cars.update");
+  if (denied) return denied;
   const supabase = await createClient();
   const { data: car, error: loadError } = await supabase
     .from("cars")
@@ -193,6 +201,8 @@ export async function changeCarStatusAction(
   id: number,
   status: CarStatusValue
 ): Promise<ActionResult> {
+  const denied = await guardPermission("cars.update");
+  if (denied) return denied;
   if (!CAR_STATUS_VALUES.includes(status)) {
     return { success: false, error: "Invalid status" };
   }
@@ -237,6 +247,8 @@ export async function changeCarStatusAction(
 }
 
 export async function deleteCarAction(id: number): Promise<ActionResult> {
+  const denied = await guardPermanentDelete();
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase.from("cars").delete().eq("id", id);
 
@@ -252,6 +264,8 @@ export async function createCarExpenseAction(
   carId: number,
   input: CarExpenseInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("finance.manage");
+  if (denied) return denied;
   const validationError = await validateExpenseInput(input);
   if (validationError) return { success: false, error: validationError };
 
@@ -278,6 +292,8 @@ export async function updateCarExpenseAction(
   expenseId: number,
   input: CarExpenseInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("finance.manage");
+  if (denied) return denied;
   const validationError = await validateExpenseInput(input);
   if (validationError) return { success: false, error: validationError };
 
@@ -307,6 +323,9 @@ export async function addDetailingCostToCarExpenseAction(input: {
   detailingOrderId: string;
   amount: number;
 }): Promise<ActionResult> {
+  const denied = await guardPermission("cars.update");
+  if (denied) return denied;
+
   const t = await getTranslations("cars");
 
   if (!input.amount || Number.isNaN(input.amount) || input.amount <= 0) {
@@ -373,6 +392,8 @@ export async function deleteCarExpenseAction(
   carId: number,
   expenseId: number
 ): Promise<ActionResult> {
+  const denied = await guardPermanentDelete();
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("car_expenses")

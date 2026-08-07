@@ -26,9 +26,16 @@ import { translateExpenseCategory } from "@/lib/i18n/status";
 type CarExpensesSectionProps = {
   car: Car;
   expenses: CarExpense[];
+  canPermanentlyDelete?: boolean;
+  canManageExpenses?: boolean;
 };
 
-export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
+export function CarExpensesSection({
+  car,
+  expenses,
+  canPermanentlyDelete = false,
+  canManageExpenses = false,
+}: CarExpensesSectionProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(false);
@@ -79,14 +86,18 @@ export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setCommissionOpen(true)}>
-            <Plus className="h-4 w-4" />
-            {t("addThirdPartyCommission")}
-          </Button>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4" />
-            {tActions("add")}
-          </Button>
+          {canManageExpenses ? (
+            <>
+              <Button variant="outline" onClick={() => setCommissionOpen(true)}>
+                <Plus className="h-4 w-4" />
+                {t("addThirdPartyCommission")}
+              </Button>
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                {tActions("add")}
+              </Button>
+            </>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -175,22 +186,28 @@ export function CarExpensesSection({ car, expenses }: CarExpensesSectionProps) {
                       {formatCurrency(Number(expense.amount))}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditExpense(expense)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteExpense(expense)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-400" />
-                        </Button>
-                      </div>
+                      {canManageExpenses || canPermanentlyDelete ? (
+                        <div className="flex justify-end gap-2">
+                          {canManageExpenses ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setEditExpense(expense)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                          {canPermanentlyDelete ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteExpense(expense)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-400" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

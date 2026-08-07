@@ -35,11 +35,13 @@ import {
   getDealById,
 } from "@/lib/queries/deals";
 import { createClient } from "@/lib/supabase/server";
+import { newEntityUuid } from "@/lib/supabase/safe-insert";
 import type { AppLocale } from "@/i18n/config";
 import type { DealFormInput, DealHandoverSideInput } from "@/lib/types/deals";
 import type { DealPaymentStatus, DealStatus } from "@/lib/constants/deals";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
 import { createCarAction } from "@/lib/actions/cars";
+import { guardPermission } from "@/lib/auth/action-guard";
 
 function revalidateDealPaths(dealId: string, clientId?: number | null, vehicleAId?: number | null, vehicleBId?: number | null) {
   revalidatePath("/deals");
@@ -160,6 +162,8 @@ async function buildDealPayload(input: DealFormInput, existing?: Awaited<ReturnT
 export async function createDealAction(
   input: DealFormInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await guardPermission<{ id: string }>("deals.create");
+  if (denied) return denied;
   const issues = collectDealValidationIssues(input, { phase: "prepare" });
   if (issues.length > 0) {
     const t = await getTranslations("deals.validation");
@@ -174,35 +178,37 @@ export async function createDealAction(
 
   const dealNumber = await allocateDealNumber(input.deal_type);
   const payload = await buildDealPayload(input);
+  const dealId = newEntityUuid();
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("deals")
     .insert({
+      id: dealId,
       deal_number: dealNumber,
       deal_type: input.deal_type,
       status: "draft",
       created_by: user.id,
       ...payload,
-    })
-    .select("id, client_id, vehicle_a_id, vehicle_b_id")
-    .single();
+    });
 
   if (error) {
     return { success: false, error: await formatSupabaseError(error) };
   }
 
   if (input.save_vehicle_b_to_crm && input.vehicle_b_source === "external" && input.vehicle_b_external) {
-    await saveTradeInVehicleToCrmAction(String(data.id), input.vehicle_b_external, input.client_id ?? null);
+    await saveTradeInVehicleToCrmAction(dealId, input.vehicle_b_external, input.client_id ?? null);
   }
 
-  revalidateDealPaths(String(data.id), data.client_id, data.vehicle_a_id, data.vehicle_b_id);
-  return { success: true, data: { id: String(data.id) } };
+  revalidateDealPaths(dealId, payload.client_id, payload.vehicle_a_id, payload.vehicle_b_id);
+  return { success: true, data: { id: dealId } };
 }
 
 export async function updateDealAction(
   dealId: string,
   input: DealFormInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("deals.update");
+  if (denied) return denied;
   const existing = await getDealById(dealId);
   if (!existing) return { success: false, error: "Deal not found" };
   if (existing.archived_at) return { success: false, error: "Deal is archived" };
@@ -248,6 +254,8 @@ export async function updateDealStatusAction(
   status: DealStatus,
   options?: { cancelled_reason?: string; locale?: AppLocale }
 ): Promise<ActionResult> {
+  const denied = await guardPermission("deals.update");
+  if (denied) return denied;
   const existing = await getDealById(dealId);
   if (!existing) return { success: false, error: "Deal not found" };
   if (!canTransitionStatus(existing.status, status)) {
@@ -377,6 +385,8 @@ export async function updateDealStatusAction(
 }
 
 export async function refreshDealSnapshotAction(dealId: string): Promise<ActionResult> {
+  const denied = await guardPermission("deals.update");
+  if (denied) return denied;
   const existing = await getDealById(dealId);
   if (!existing) return { success: false, error: "Deal not found" };
 
@@ -425,6 +435,8 @@ export async function updateDealPaymentAction(
     markPaid?: boolean;
   }
 ): Promise<ActionResult> {
+  const denied = await guardPermission("deals.update");
+  if (denied) return denied;
   const supabase = await createClient();
   const update: Record<string, unknown> = {
     payment_status: input.payment_status,
@@ -447,6 +459,8 @@ export async function updateDealPaymentAction(
 }
 
 export async function archiveDealAction(dealId: string, archived: boolean): Promise<ActionResult> {
+  const denied = await guardPermission("deals.archive");
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("deals")
@@ -468,6 +482,8 @@ export async function saveTradeInVehicleToCrmAction(
   external: NonNullable<DealFormInput["vehicle_b_external"]>,
   clientId: number | null
 ): Promise<ActionResult<{ carId: number }>> {
+  const denied = await guardPermission<{ carId: number }>("deals.update");
+  if (denied) return denied;
   const result = await createCarAction({
     brand: external.make,
     model: external.model,
@@ -514,6 +530,8 @@ export async function saveTradeInVehicleToCrmAction(
 }
 
 export async function createDealAndRedirectAction(input: DealFormInput) {
+  const denied = await guardPermission("deals.create");
+  if (denied) return denied;
   const result = await createDealAction(input);
   if (!result.success || !result.data) {
     return result;
@@ -525,6 +543,8 @@ export async function calculateDealPaymentPreviewAction(
   vehicleAValue: number | null,
   vehicleBValue: number | null
 ): Promise<ActionResult<ReturnType<typeof calculateDealPayment>>> {
+  const denied = await guardPermission<ReturnType<typeof calculateDealPayment>>("deals.view");
+  if (denied) return denied;
   return {
     success: true,
     data: calculateDealPayment(vehicleAValue, vehicleBValue),
@@ -534,6 +554,8 @@ export async function calculateDealPaymentPreviewAction(
 export async function upsertDealHandoverAction(
   input: DealHandoverSideInput
 ): Promise<ActionResult> {
+  const denied = await guardPermission("deals.update");
+  if (denied) return denied;
   const deal = await getDealById(input.deal_id);
   if (!deal) {
     return { success: false, error: "Deal not found" };
@@ -576,6 +598,8 @@ export async function generateAmountInWordsAction(input: {
   currency: "CZK" | "EUR";
   locale?: AppLocale;
 }): Promise<ActionResult<{ words: string }>> {
+  const denied = await guardPermission<{ words: string }>("deals.view");
+  if (denied) return denied;
   const words = formatAmountInWords(
     input.amount,
     input.currency,

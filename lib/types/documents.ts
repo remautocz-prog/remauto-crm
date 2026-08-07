@@ -6,6 +6,7 @@ import type {
   PaymentMethod,
 } from "@/lib/constants/documents";
 import type { DocumentVehicleMode } from "@/lib/documents/vehicle";
+import type { DocumentListSegment } from "@/lib/documents/list-segment";
 
 export type ChecklistItem = {
   key: string;
@@ -74,6 +75,7 @@ export type DocumentTask = {
   notes: string | null;
   result_notes: string | null;
   archived_at: string | null;
+  archived_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -146,12 +148,14 @@ export type DocumentTasksListParams = {
   service_type?: string;
   assigned_to?: string;
   payment_status?: string;
+  segment?: DocumentListSegment;
   overdue?: boolean;
   due_today?: boolean;
   due_this_week?: boolean;
   no_deadline?: boolean;
   unassigned_only?: boolean;
   outstanding_only?: boolean;
+  /** @deprecated Use segment=archived */
   archived?: boolean;
   sort?: string;
 };
@@ -175,6 +179,10 @@ export type DocumentTaskWithRelations = DocumentTask & {
     client_id: number | null;
   } | null;
   assignee?: {
+    id: string;
+    full_name: string | null;
+  } | null;
+  archiver?: {
     id: string;
     full_name: string | null;
   } | null;
@@ -243,4 +251,40 @@ export type DocumentDashboardAlert = {
   title: string;
   subtitle?: string | null;
   href: string;
+};
+
+import type { DateRangePreset } from "@/lib/date-range/filter";
+
+export type DocumentEmployeeDashboardKpis = {
+  myActive: number;
+  dueInPeriod: number;
+  overdue: number;
+  completedInPeriod: number;
+  createdInPeriod: number;
+};
+
+export type DocumentEmployeeDashboardData = {
+  employeeId: string | null;
+  employeeName: string;
+  viewerName: string;
+  today: string;
+  dateRange: {
+    from: string;
+    to: string;
+    preset: DateRangePreset;
+  };
+  canSelectEmployee: boolean;
+  assigneeOptions: Array<{ id: string; full_name: string }>;
+  kpis: DocumentEmployeeDashboardKpis;
+  needsAttention: DocumentTaskWithRelations[];
+  overdueAttentionTotal: number;
+  hasMoreOverdueAttention: boolean;
+  todayTasks: DocumentTaskWithRelations[];
+  upcomingDeadlines: {
+    today: DocumentTaskWithRelations[];
+    tomorrow: DocumentTaskWithRelations[];
+    nextSevenDays: DocumentTaskWithRelations[];
+  };
+  activeTasks: DocumentTaskWithRelations[];
+  recentlyCompleted: DocumentTaskWithRelations[];
 };

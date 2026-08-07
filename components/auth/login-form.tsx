@@ -20,7 +20,7 @@ import { useState } from "react";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const redirectTo = searchParams.get("redirectTo") ?? "/";
   const tAuth = useTranslations("auth");
   const tFields = useTranslations("fields");
   const tActions = useTranslations("actions");

@@ -1,8 +1,5 @@
-import { getDocumentFinanceSummary } from "@/lib/documents/helpers";
-import {
-  isDateWithinPeriod,
-  type DashboardPeriodBounds,
-} from "@/lib/dashboard/period";
+import { getDocumentsFinanceSummary } from "@/lib/finance/documents-summary";
+import type { DashboardPeriodBounds } from "@/lib/dashboard/period";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 
 function roundMoney(value: number) {
@@ -13,25 +10,11 @@ export function computeDocumentsRealizedProfit(
   tasks: DocumentTaskWithRelations[],
   bounds: DashboardPeriodBounds
 ): number {
-  let total = 0;
-
-  for (const task of tasks) {
-    const completedAt = task.completed_at?.slice(0, 10);
-    if (!completedAt || !isDateWithinPeriod(completedAt, bounds)) continue;
-
-    const finance = getDocumentFinanceSummary(task);
-    if (
-      finance.servicePrice <= 0 &&
-      finance.costPrice <= 0 &&
-      !finance.usesServiceRows
-    ) {
-      continue;
-    }
-    total += finance.profit;
-  }
-
-  return roundMoney(total);
+  return getDocumentsFinanceSummary({ tasks, bounds }).profit;
 }
+
+export { getDocumentsFinanceSummary } from "@/lib/finance/documents-summary";
+export type { DocumentsFinanceSummary } from "@/lib/finance/documents-summary";
 
 export function computeCombinedRealizedResult(input: {
   carsRealizedProfit: number;

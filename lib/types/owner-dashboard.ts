@@ -2,6 +2,12 @@ import type {
   ProfitDirectionBar,
   ProfitTrendPoint,
 } from "@/lib/dashboard/owner-chart-metrics";
+import type { ResolvedDateRange } from "@/lib/date-range/filter";
+import type {
+  BusinessDirectionComparisons,
+  FinanceBusinessDirectionCards,
+} from "@/lib/finance/finance-center-directions";
+import type { OwnerAttentionLoadResult } from "@/lib/queries/owner-attention";
 import type { DashboardActivityItem } from "@/lib/types/dashboard";
 import type { DashboardPeriod } from "@/lib/dashboard/period";
 import type { DetailingOrderWithServices } from "@/lib/types/detailing";
@@ -18,26 +24,12 @@ export type OwnerDashboardSectionErrors = {
 
 export type OwnerTopCards = {
   monthlyProfit: number;
+  documentsProfit: number;
   carsInStock: number;
   commissionCarsInStock: number;
   documentsInProgress: number;
   detailingOrdersToday: number;
   attentionCount: number;
-};
-
-export type OwnerAttentionSeverity = "critical" | "warning" | "info";
-
-export type OwnerAttentionItem = {
-  id: string;
-  labelKey:
-    | "attentionDocumentsOverdue"
-    | "attentionDetailingUnpaid"
-    | "attentionDetailingReady"
-    | "attentionSoldMissingPrice"
-    | "attentionActiveMissingSalePrice";
-  count: number;
-  href: string;
-  severity: OwnerAttentionSeverity;
 };
 
 export type OwnerChartsData = {
@@ -57,10 +49,19 @@ export type OwnerTodaySection = {
 };
 
 export type OwnerDashboardData = {
+  dateRange: ResolvedDateRange;
   period: DashboardPeriod;
   topCards: OwnerTopCards;
+  businessDirections: FinanceBusinessDirectionCards;
+  businessDirectionComparisons: BusinessDirectionComparisons;
+  attention: OwnerAttentionLoadResult;
+  attentionQuickActions: {
+    documentsStatus: boolean;
+    detailingPayment: boolean;
+    detailingStatus: boolean;
+    carsStatus: boolean;
+  };
   charts: OwnerChartsData;
-  attentionItems: OwnerAttentionItem[];
   today: OwnerTodaySection;
   detailing: OwnerDetailingSummary;
   recentActivity: DashboardActivityItem[];

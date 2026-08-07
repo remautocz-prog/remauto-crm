@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { randomUUID } from "crypto";
+import { newEntityUuid } from "@/lib/supabase/safe-insert";
 import {
   DOCUMENT_TEMPLATE_CATEGORIES,
   DOCUMENT_TEMPLATE_LANGUAGES,
@@ -26,6 +26,8 @@ import {
   uploadTemplateFile,
 } from "@/lib/storage/document-storage";
 import { createClient } from "@/lib/supabase/server";
+import { guardPermission, guardPermanentDelete } from "@/lib/auth/action-guard";
+import { formatDeleteActionError } from "@/lib/utils/action-errors";
 import type {
   DocumentTemplateCategory,
   DocumentTemplateLanguage,
@@ -47,6 +49,8 @@ function isDocxFile(file: File) {
 export async function updateCompanySettingsAction(
   input: Partial<Omit<CompanySettings, "id" | "updated_at">>
 ): Promise<ActionResult> {
+  const denied = await guardPermission("settings.manage");
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("company_settings")
@@ -76,6 +80,8 @@ export async function updateCompanySettingsAction(
 export async function createDocumentTemplateAction(formData: FormData): Promise<
   ActionResult<{ id: string; recognized: string[]; unknown: string[] }>
 > {
+  const denied = await guardPermission<{ id: string; recognized: string[]; unknown: string[] }>("documents.create");
+  if (denied) return denied;
   const supabase = await createClient();
   const {
     data: { user },
@@ -126,7 +132,7 @@ export async function createDocumentTemplateAction(formData: FormData): Promise<
   }
 
   const { recognized, unknown } = classifyPlaceholders(placeholders);
-  const templateId = randomUUID();
+  const templateId = newEntityUuid();
   let storagePath: string;
 
   try {
@@ -169,6 +175,8 @@ export async function archiveDocumentTemplateAction(
   templateId: string,
   archived: boolean
 ): Promise<ActionResult> {
+  const denied = await guardPermission("documents.archive");
+  if (denied) return denied;
   const supabase = await createClient();
   const { error } = await supabase
     .from("document_templates")
@@ -186,6 +194,8 @@ export async function archiveDocumentTemplateAction(
 export async function duplicateDocumentTemplateAction(
   templateId: string
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await guardPermission<{ id: string }>("documents.create");
+  if (denied) return denied;
   const template = await getDocumentTemplateById(templateId);
   if (!template) {
     return { success: false, error: "Template not found" };
@@ -197,7 +207,7 @@ export async function duplicateDocumentTemplateAction(
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Unauthorized" };
 
-  const newId = randomUUID();
+  const newId = newEntityUuid();
   const { downloadTemplateFile, uploadTemplateFile: uploadCopy } = await import(
     "@/lib/storage/document-storage"
   );
@@ -244,6 +254,8 @@ export async function updateDocumentTemplateMetadataAction(input: {
   description?: string | null;
   data_source_mode: (typeof DATA_SOURCE_MODES)[number];
 }): Promise<ActionResult> {
+  const denied = await guardPermission("documents.update");
+  if (denied) return denied;
   const supabase = await createClient();
   const {
     data: { user },
@@ -284,6 +296,8 @@ export async function updateDocumentTemplateMetadataAction(input: {
 export async function validateTemplateFileAction(
   formData: FormData
 ): Promise<ActionResult<{ recognized: string[]; unknown: string[] }>> {
+  const denied = await guardPermission<{ recognized: string[]; unknown: string[] }>("settings.manage");
+  if (denied) return denied;
   const file = formData.get("file");
   if (!(file instanceof File)) {
     return { success: false, error: "DOCX file is required" };
@@ -308,6 +322,8 @@ export async function validateTemplateFileAction(
 export async function deleteDocumentTemplateAction(
   templateId: string
 ): Promise<ActionResult> {
+  const denied = await guardPermanentDelete();
+  if (denied) return denied;
   const generatedCount = await countGeneratedDocumentsForTemplate(templateId);
   if (generatedCount > 0) {
     return {
@@ -328,7 +344,7 @@ export async function deleteDocumentTemplateAction(
     .eq("id", templateId);
 
   if (error) {
-    return { success: false, error: await formatSupabaseError(error) };
+    return { success: false, error: await formatDeleteActionError(error) };
   }
 
   await removeStorageFile("templates", template.storage_path).catch(() => undefined);

@@ -5,8 +5,14 @@ import {
 } from "@/lib/cars/business-rules";
 import { isDateWithinPeriod, type DashboardPeriodBounds } from "@/lib/dashboard/period";
 import type { ProfitDirectionBar } from "@/lib/dashboard/owner-chart-metrics";
+import {
+  getDocumentFinanceSummary,
+  getTaskServiceLabel,
+} from "@/lib/documents/helpers";
+import { isRecognizedDocumentTaskForFinance } from "@/lib/finance/documents-summary";
 import type { Car } from "@/lib/types/cars";
 import type { DetailingOrderWithServices } from "@/lib/types/detailing";
+import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
@@ -15,7 +21,7 @@ function roundMoney(value: number) {
 export type FinanceTopSourceRow = {
   id: string;
   name: string;
-  direction: "cars" | "detailing";
+  direction: "cars" | "detailing" | "documents";
   amount: number;
 };
 
@@ -38,6 +44,7 @@ export function buildTopProfitSources(input: {
   expensesByCar: Map<number, number>;
   bounds: DashboardPeriodBounds;
   detailingOrders: DetailingOrderWithServices[];
+  documentTasks?: DocumentTaskWithRelations[];
   limit?: number;
 }): FinanceTopSourceRow[] {
   const limit = input.limit ?? 5;
@@ -84,6 +91,41 @@ export function buildTopProfitSources(input: {
       id: `detailing-${name}`,
       name,
       direction: "detailing",
+      amount,
+    });
+  }
+
+  const documentServiceProfit = new Map<string, number>();
+  for (const task of input.documentTasks ?? []) {
+    if (!isRecognizedDocumentTaskForFinance(task, input.bounds)) continue;
+
+    if (task.services?.length) {
+      for (const service of task.services) {
+        const profit = roundMoney(service.service_price - service.cost_price);
+        if (profit <= 0) continue;
+        const name = service.service_name.trim() || getTaskServiceLabel(task) || "—";
+        documentServiceProfit.set(
+          name,
+          roundMoney((documentServiceProfit.get(name) ?? 0) + profit)
+        );
+      }
+      continue;
+    }
+
+    const finance = getDocumentFinanceSummary(task);
+    if (finance.profit <= 0) continue;
+    const name = getTaskServiceLabel(task) || "—";
+    documentServiceProfit.set(
+      name,
+      roundMoney((documentServiceProfit.get(name) ?? 0) + finance.profit)
+    );
+  }
+
+  for (const [name, amount] of documentServiceProfit.entries()) {
+    rows.push({
+      id: `documents-${name}`,
+      name,
+      direction: "documents",
       amount,
     });
   }
@@ -175,7 +217,7 @@ export function simplifyFinanceDirectionBars(input: {
     });
   }
 
-  if (input.documentsProfit != null && input.documentsProfit !== 0) {
+  if (input.documentsProfit != null) {
     summaries.push({
       id: "documents",
       labelKey: "directionDocuments",

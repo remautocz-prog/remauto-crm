@@ -11,44 +11,26 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import type {
-  OwnerAttentionItem,
-  OwnerDashboardData,
-} from "@/lib/types/owner-dashboard";
+import type { OwnerDashboardData } from "@/lib/types/owner-dashboard";
+import { DateRangeSelector } from "@/components/shared/date-range-selector";
+import { buildDateRangeHref } from "@/lib/date-range/filter";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { OwnerAttentionSection } from "@/components/dashboard/owner-attention-section";
 import {
   OwnerProfitDirectionChart,
   OwnerProfitTrendChart,
 } from "@/components/dashboard/owner-charts";
+import { OwnerBusinessDirectionCards } from "@/components/dashboard/owner-business-direction-cards";
 import { OwnerKpiCard } from "@/components/dashboard/owner-kpi-card";
 import { OwnerRecentActivity } from "@/components/dashboard/owner-recent-activity";
 import { getDocumentVehicleTitle } from "@/lib/documents/vehicle";
 import { getCustomerDisplayName } from "@/lib/detailing/validation";
 import { useFormatters } from "@/lib/hooks/use-formatters";
 import { translateDocumentStatus } from "@/lib/i18n/documents";
-import { cn } from "@/lib/utils";
 
 type OwnerDashboardProps = {
   data: OwnerDashboardData;
   userName?: string | null;
-};
-
-const ATTENTION_STYLES: Record<
-  OwnerAttentionItem["severity"],
-  { row: string; badge: string }
-> = {
-  critical: {
-    row: "border-red-500/30 bg-red-950/15 hover:border-red-500/45",
-    badge: "bg-red-500/15 text-red-200",
-  },
-  warning: {
-    row: "border-amber-500/30 bg-amber-950/15 hover:border-amber-500/45",
-    badge: "bg-amber-500/15 text-amber-200",
-  },
-  info: {
-    row: "border-sky-500/30 bg-sky-950/15 hover:border-sky-500/45",
-    badge: "bg-sky-500/15 text-sky-200",
-  },
 };
 
 function TodayList({
@@ -84,9 +66,14 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
   const t = useTranslations("dashboard.owner");
   const tDocStatus = useTranslations("documents.status");
   const tDetailingStatus = useTranslations("detailing.status");
+  const tDateRange = useTranslations("dateRange");
   const { formatCurrency, formatNumber, formatDate } = useFormatters();
   const dash = "—";
   const loadFailed = t("sectionLoadFailed");
+  const periodSubtitle =
+    data.dateRange.preset === "custom"
+      ? `${formatDate(data.dateRange.from, dash)} – ${formatDate(data.dateRange.to, dash)}`
+      : tDateRange(`preset.${data.dateRange.preset}` as "preset.today");
 
   const directionLabels = {
     directionOwnedCars: t("directionOwnedCars"),
@@ -95,15 +82,17 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
     directionDocuments: t("directionDocuments"),
   };
 
+  const financeHref = buildDateRangeHref("/finance", data.dateRange);
+
   const kpiCards = [
     {
       id: "monthly-profit",
-      label: t("monthlyProfit"),
+      label: t("realizedProfit"),
       value: formatCurrency(data.topCards.monthlyProfit),
-      hint: t("currentMonth"),
+      hint: periodSubtitle,
       icon: Wallet,
       tone: "profit" as const,
-      href: "/finance",
+      href: financeHref,
     },
     {
       id: "cars-in-stock",
@@ -144,7 +133,7 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
     {
       id: "requires-attention",
       label: t("requiresAttention"),
-      value: formatNumber(data.topCards.attentionCount),
+      value: formatNumber(data.attention.summary.total),
       hint: t("actionRequiredHint"),
       icon: AlertTriangle,
       tone: "attention" as const,
@@ -156,30 +145,82 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
     formatDate(value, dash).replace(/\s/g, " ").slice(0, 6);
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      <DashboardHeader userName={userName} title={t("title")} />
+    <div>
+      <header>
+        <DashboardHeader userName={userName} title={t("title")} />
 
-      <section className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        {kpiCards.map((card) => (
+        <DateRangeSelector
+          from={data.dateRange.from}
+          to={data.dateRange.to}
+          preset={data.dateRange.preset}
+          className="mt-5"
+        />
+      </header>
+
+      <section className="mt-7">
+        <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-2">
           <OwnerKpiCard
-            key={card.id}
-            label={card.label}
-            value={card.value}
-            hint={card.hint}
-            icon={card.icon}
-            tone={card.tone}
-            href={card.href}
+            key={kpiCards[0].id}
+            label={kpiCards[0].label}
+            value={kpiCards[0].value}
+            hint={kpiCards[0].hint}
+            icon={kpiCards[0].icon}
+            tone={kpiCards[0].tone}
+            href={kpiCards[0].href}
           />
-        ))}
+          <OwnerKpiCard
+            label={t("documentsProfit")}
+            value={formatCurrency(data.topCards.documentsProfit)}
+            hint={periodSubtitle}
+            icon={FileText}
+            tone="documents"
+            href={financeHref}
+          />
+        </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="mt-8 space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-white">
+            {t("businessResultsByDirection")}
+          </h2>
+          <p className="text-xs text-zinc-500">{periodSubtitle}</p>
+        </div>
+        <OwnerBusinessDirectionCards
+          directions={data.businessDirections}
+          comparisons={data.businessDirectionComparisons}
+          dateRange={data.dateRange}
+          formatCurrency={formatCurrency}
+          formatNumber={formatNumber}
+        />
+      </section>
+
+      <section className="mt-8">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+          {tDateRange("currentSnapshot")}
+        </p>
+        <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+          {kpiCards.slice(1).map((card) => (
+            <OwnerKpiCard
+              key={card.id}
+              label={card.label}
+              value={card.value}
+              hint={card.hint}
+              icon={card.icon}
+              tone={card.tone}
+              href={card.href}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-8 grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
           <div className="mb-4 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-400" aria-hidden />
             <div>
               <h3 className="text-sm font-semibold text-white">{t("profitTrend")}</h3>
-              <p className="text-xs text-zinc-500">{t("last30Days")}</p>
+              <p className="text-xs text-zinc-500">{periodSubtitle}</p>
             </div>
           </div>
           {data.errors.charts ? (
@@ -199,7 +240,7 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
           <div className="mb-4">
             <h3 className="text-sm font-semibold text-white">{t("profitByDirection")}</h3>
-            <p className="text-xs text-zinc-500">{t("currentMonth")}</p>
+            <p className="text-xs text-zinc-500">{periodSubtitle}</p>
           </div>
           {data.errors.charts ? (
             <p className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
@@ -216,9 +257,9 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
+      <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
         <h3 className="mb-4 text-base font-semibold text-white">{t("today")}</h3>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
           <div className="space-y-5">
             <TodayList
               title={t("detailingAppointmentsToday")}
@@ -330,49 +371,17 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
         </div>
       </section>
 
-      {data.attentionItems.length > 0 ? (
-        <section id="attention" className="scroll-mt-24 space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <h3 className="text-base font-semibold text-white">
-              {t("requiresAttention")}
-            </h3>
-            <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-amber-200">
-              {formatNumber(data.topCards.attentionCount)}
-            </span>
-          </div>
-          <ul className="space-y-2">
-            {data.attentionItems.map((item) => {
-              const styles = ATTENTION_STYLES[item.severity];
-              return (
-                <li key={item.id}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors",
-                      styles.row
-                    )}
-                  >
-                    <span className="text-sm text-zinc-100">{t(item.labelKey)}</span>
-                    <span
-                      className={cn(
-                        "rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums",
-                        styles.badge
-                      )}
-                    >
-                      {formatNumber(item.count)}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
-
-      <OwnerRecentActivity
-        items={data.recentActivity}
-        error={data.errors.activity ? loadFailed : undefined}
+      <OwnerAttentionSection
+        attention={data.attention}
+        quickActions={data.attentionQuickActions}
       />
+
+      <div className="mt-8">
+        <OwnerRecentActivity
+          items={data.recentActivity}
+          error={data.errors.activity ? loadFailed : undefined}
+        />
+      </div>
     </div>
   );
 }
