@@ -388,7 +388,6 @@ export function DocumentTaskDetails({
           clientId={task.client_id}
           vehicleId={task.car_id}
           documentTaskId={task.id}
-          canPermanentlyDelete={canPermanentlyDelete}
         />
       </div>
 
