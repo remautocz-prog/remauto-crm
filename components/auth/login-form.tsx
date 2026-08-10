@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
+import { resolveClientPostAuthRedirect } from "@/lib/auth/client-post-auth-redirect";
 import { useFormatSupabaseError } from "@/lib/hooks/use-supabase-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +49,8 @@ export function LoginForm() {
       return;
     }
 
-    router.push(redirectTo);
+    const destination = await resolveClientPostAuthRedirect(supabase, redirectTo);
+    router.push(destination);
     router.refresh();
   }
 

@@ -11,6 +11,7 @@ import {
   shouldSetPassword,
 } from "@/lib/auth/invite-flow";
 import { createClient } from "@/lib/supabase/client";
+import { resolveClientPostAuthRedirect } from "@/lib/auth/client-post-auth-redirect";
 import { LoadingScreen } from "@/components/shared/loading-screen";
 
 function readHashParams(): URLSearchParams {
@@ -35,6 +36,16 @@ function resolveRedirectTarget(next: string | null): string {
     return next;
   }
   return "/";
+}
+
+async function resolveSafePostAuthDestination(
+  supabase: ReturnType<typeof createClient>,
+  redirectNext: string | null
+): Promise<string> {
+  return resolveClientPostAuthRedirect(
+    supabase,
+    resolveRedirectTarget(redirectNext)
+  );
 }
 
 export function AuthCallbackHandler() {
@@ -73,7 +84,7 @@ export function AuthCallbackHandler() {
           return AUTH_SET_PASSWORD_PATH;
         }
 
-        return resolveRedirectTarget(redirectNext);
+        return resolveSafePostAuthDestination(supabase, redirectNext);
       }
 
       const hashError = hashParams.get("error");

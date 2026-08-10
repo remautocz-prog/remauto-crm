@@ -247,12 +247,15 @@ export async function getDocumentTasksForList(
 }
 
 export async function getDocumentTaskById(id: number) {
+  const access = await requireAuthenticatedAccess();
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("document_tasks")
-    .select(TASK_SELECT)
-    .eq("id", id)
-    .maybeSingle();
+  let query = supabase.from("document_tasks").select(TASK_SELECT).eq("id", id);
+
+  if (access.role === "documents") {
+    query = query.eq("assigned_to", access.userId);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) throw error;
   if (!data) return null;

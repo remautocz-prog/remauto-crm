@@ -1,3 +1,5 @@
+import { isInternalErrorText } from "@/lib/utils/user-error-classifier";
+
 const NON_DISPLAYABLE_PRIMITIVES = new Set([
   "0",
   "1",
@@ -95,10 +97,11 @@ export function extractErrorMessage(error: unknown): string {
   return fallback && !isNonDisplayablePrimitive(fallback) ? fallback : "Unknown error";
 }
 
-/** Normalize action error payloads for UI display. Never renders 0/1/true/false/nullish. */
+/** Normalize action error payloads for UI display. Never renders internal backend text. */
 export function normalizeActionError(error: unknown, fallback: string): string {
-  const message = extractErrorMessage(error);
-  if (!message || isNonDisplayablePrimitive(message)) {
+  const message =
+    typeof error === "string" ? error.trim() : extractErrorMessage(error);
+  if (!message || isInternalErrorText(message)) {
     return fallback;
   }
   return message;

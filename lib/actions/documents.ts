@@ -171,22 +171,17 @@ export async function createDocumentTaskAction(
   );
 
   if (error) {
-    console.error("[createDocumentTaskAction]", error, finalPayload);
     return { success: false, error: await formatSupabaseError(error) };
   }
 
   try {
     await syncDocumentTaskServices(id, input.services ?? [], []);
   } catch (serviceError) {
-    console.error("[createDocumentTaskAction] service sync failed", serviceError);
     await supabase.from("document_tasks").delete().eq("id", id);
     const t = await getTranslations("documents");
     return {
       success: false,
-      error:
-        serviceError instanceof Error
-          ? serviceError.message
-          : t("serviceSaveFailed"),
+      error: t("serviceSaveFailed"),
     };
   }
 
@@ -216,7 +211,11 @@ export async function updateDocumentTaskAction(
 
   const payload = mapDocumentTaskPayload(input);
   const existing = await getDocumentTaskById(id);
-  const finalPayload = finalizeTaskPayload(payload, input, existing ?? undefined);
+  if (!existing) {
+    const t = await getTranslations("documents");
+    return { success: false, error: t("taskNotFound") };
+  }
+  const finalPayload = finalizeTaskPayload(payload, input, existing);
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -225,7 +224,6 @@ export async function updateDocumentTaskAction(
     .eq("id", id);
 
   if (error) {
-    console.error("[updateDocumentTaskAction]", error, finalPayload);
     return { success: false, error: await formatSupabaseError(error) };
   }
 
@@ -236,14 +234,10 @@ export async function updateDocumentTaskAction(
       (existing?.services ?? []).map((service) => service.id)
     );
   } catch (serviceError) {
-    console.error("[updateDocumentTaskAction] service sync failed", serviceError);
     const t = await getTranslations("documents");
     return {
       success: false,
-      error:
-        serviceError instanceof Error
-          ? serviceError.message
-          : t("serviceSaveFailed"),
+      error: t("serviceSaveFailed"),
     };
   }
 

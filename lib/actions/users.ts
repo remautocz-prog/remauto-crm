@@ -13,7 +13,7 @@ import {
   hasAdminClient,
 } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { extractErrorMessage } from "@/lib/utils/action-error-message";
+import { formatInviteUserFacingError, formatUserFacingError } from "@/lib/utils/user-facing-error";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
 
 async function getActorAccess(): Promise<
@@ -190,7 +190,7 @@ export async function updateUserProfileAction(input: {
       input.userId
     );
     if (readError) {
-      return { success: false, error: extractErrorMessage(readError) };
+      return { success: false, error: await formatUserFacingError(readError) };
     }
 
     const existingMeta =
@@ -206,7 +206,7 @@ export async function updateUserProfileAction(input: {
     });
 
     if (authError) {
-      return { success: false, error: extractErrorMessage(authError) };
+      return { success: false, error: await formatUserFacingError(authError) };
     }
   }
 
@@ -265,8 +265,8 @@ export async function inviteManagedUserAction(input: {
 
     if (error || !data.user) {
       const errorMessage = error
-        ? extractErrorMessage(error)
-        : "Supabase Auth inviteUserByEmail returned no user.";
+        ? await formatInviteUserFacingError(error)
+        : t("inviteFailed");
       return { success: false, error: errorMessage };
     }
 
@@ -301,7 +301,7 @@ export async function inviteManagedUserAction(input: {
     revalidatePath("/settings/users");
     return { success: true, data: { userId: data.user.id } };
   } catch (error) {
-    const message = extractErrorMessage(error);
+    const message = await formatUserFacingError(error);
     return { success: false, error: message };
   }
 }
@@ -334,9 +334,9 @@ export async function resendManagedUserInvitationAction(input: {
   const { data: authUser, error: readError } = await admin.auth.admin.getUserById(
     input.userId
   );
-  if (readError || !authUser.user?.email) {
-    return { success: false, error: readError?.message ?? t("userNotFound") };
-  }
+    if (readError || !authUser.user?.email) {
+      return { success: false, error: t("userNotFound") };
+    }
 
   if (authUser.user.last_sign_in_at) {
     return { success: false, error: t("permissionDenied") };
@@ -354,7 +354,7 @@ export async function resendManagedUserInvitationAction(input: {
   });
 
   if (error) {
-    return { success: false, error: extractErrorMessage(error) };
+    return { success: false, error: await formatInviteUserFacingError(error) };
   }
 
   revalidatePath("/settings/users");

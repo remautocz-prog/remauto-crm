@@ -2481,6 +2481,8 @@
     "cars": "Failed to load cars",
     "carDetails": "Failed to load car details",
     "generic": "An unknown error occurred",
+    "operationFailed": "Could not complete the operation. Please try again.",
+    "invalidCredentials": "Invalid email or password.",
     "loadApp": "Failed to load the application.",
     "loadDashboard": "Failed to load dashboard data.",
     "loadCars": "Failed to load the car list.",

@@ -1,19 +1,12 @@
+import { formatUserFacingError } from "@/lib/utils/user-facing-error";
+
 export async function formatSupabaseError(error: {
   message?: string;
   code?: string;
   details?: string | null;
   hint?: string | null;
 }) {
-  console.error("[Supabase]", {
-    code: error.code,
-    message: error.message,
-    details: error.details,
-    hint: error.hint,
-  });
-
-  const { extractErrorMessage } = await import("@/lib/utils/action-error-message");
-  const message = extractErrorMessage(error);
-  return message === "Unknown error" ? "Unknown database error" : message;
+  return formatUserFacingError(error);
 }
 
 export type ActionResult<T = undefined> =

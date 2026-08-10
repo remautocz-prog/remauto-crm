@@ -85,13 +85,6 @@ export async function createCarAction(
   );
 
   if (error) {
-    console.error("[createCarAction] Supabase insert failed:", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      payload,
-    });
     return { success: false, error: await formatSupabaseError(error) };
   }
 
@@ -119,13 +112,6 @@ export async function updateCarAction(
     .eq("id", id);
 
   if (error) {
-    console.error("[updateCarAction] Supabase update failed:", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      payload,
-    });
     return { success: false, error: await formatSupabaseError(error) };
   }
 
@@ -179,7 +165,6 @@ export async function markCarSoldAction(
     .eq("id", id);
 
   if (error) {
-    console.error("[markCarSoldAction] Supabase update failed:", error);
     return { success: false, error: await formatSupabaseError(error) };
   }
 

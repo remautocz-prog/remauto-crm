@@ -90,7 +90,6 @@ export async function createClientAction(
   );
 
   if (error) {
-    console.error("[createClientAction] Supabase insert failed:", error, payload);
     return { success: false, error: await formatSupabaseError(error) };
   }
 
@@ -136,7 +135,6 @@ export async function updateClientAction(
     .eq("id", id);
 
   if (error) {
-    console.error("[updateClientAction] Supabase update failed:", error, payload);
     return { success: false, error: await formatSupabaseError(error) };
   }
 
@@ -157,7 +155,6 @@ export async function archiveClientAction(id: number): Promise<ActionResult> {
     .eq("id", id);
 
   if (error) {
-    console.error("[archiveClientAction] Supabase update failed:", error);
     return { success: false, error: await formatSupabaseError(error) };
   }
 

@@ -2481,6 +2481,8 @@
     "cars": "Chyba načítání vozidel",
     "carDetails": "Chyba načítání vozidla",
     "generic": "Došlo k neznámé chybě",
+    "operationFailed": "Operaci se nepodařilo dokončit. Zkuste to prosím znovu.",
+    "invalidCredentials": "Neplatný e-mail nebo heslo.",
     "loadApp": "Nepodařilo se načíst aplikaci.",
     "loadDashboard": "Nepodařilo se načíst data přehledu.",
     "loadCars": "Nepodařilo se načíst seznam vozidel.",
