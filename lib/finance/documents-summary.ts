@@ -1,6 +1,11 @@
-import { COMPLETED_DOCUMENT_TASK_STATUSES } from "@/lib/constants/documents";
-import { getDocumentFinanceSummary } from "@/lib/documents/helpers";
-import { isDateWithinPeriod, type DashboardPeriodBounds } from "@/lib/dashboard/period";
+import {
+  getDocumentFinanceSummary,
+} from "@/lib/documents/helpers";
+import {
+  isDocumentTaskFinalReceivableInPeriod,
+  isDocumentTaskFinanciallyRecognized,
+} from "@/lib/documents/finance-recognition";
+import type { DashboardPeriodBounds } from "@/lib/dashboard/period";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 
 export type DocumentsFinanceSummary = {
@@ -19,35 +24,15 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-/** Completed document tasks recognized for accrual finance in the selected period. */
-export function isRecognizedDocumentTaskForFinance(
-  task: DocumentTaskWithRelations,
-  bounds: DashboardPeriodBounds
-): boolean {
-  if (task.archived_at) return false;
-  if (!COMPLETED_DOCUMENT_TASK_STATUSES.includes(task.status as never)) return false;
-
-  const completedAt = task.completed_at?.slice(0, 10);
-  if (!completedAt || !isDateWithinPeriod(completedAt, bounds)) return false;
-
-  const finance = getDocumentFinanceSummary(task);
-  if (
-    finance.servicePrice <= 0 &&
-    finance.costPrice <= 0 &&
-    !finance.usesServiceRows
-  ) {
-    return false;
-  }
-
-  return true;
-}
+/** @deprecated Prefer isDocumentTaskFinanciallyRecognized — kept for existing imports. */
+export const isRecognizedDocumentTaskForFinance = isDocumentTaskFinanciallyRecognized;
 
 /**
  * Canonical Documents finance rollup for Finance Center and Owner Dashboard.
  *
- * Revenue recognition: service_price on completed tasks (completed_at in period).
- * Profit: revenue − cost_price (internal costs entered on task / line items).
- * Payment status is tracked separately (paid vs outstanding receivables).
+ * Realized profit (cash-completed): final status + fully paid + recognition date in period.
+ * Revenue = resolved service_price; profit = revenue − resolved cost_price.
+ * Unpaid revenue = outstanding balance on final but unpaid/partial tasks in period.
  */
 export function getDocumentsFinanceSummary(input: {
   tasks: DocumentTaskWithRelations[];
@@ -56,23 +41,30 @@ export function getDocumentsFinanceSummary(input: {
   let revenue = 0;
   let expenses = 0;
   let paidRevenue = 0;
+  let unpaidRevenue = 0;
   let completedCount = 0;
 
   for (const task of input.tasks) {
-    if (!isRecognizedDocumentTaskForFinance(task, input.bounds)) continue;
+    if (isDocumentTaskFinanciallyRecognized(task, input.bounds)) {
+      const finance = getDocumentFinanceSummary(task);
+      revenue += finance.servicePrice;
+      expenses += finance.costPrice;
+      paidRevenue += finance.servicePrice;
+      completedCount += 1;
+      continue;
+    }
 
-    const finance = getDocumentFinanceSummary(task);
-    revenue += finance.servicePrice;
-    expenses += finance.costPrice;
-    paidRevenue += Math.min(finance.paidAmount, finance.servicePrice);
-    completedCount += 1;
+    if (isDocumentTaskFinalReceivableInPeriod(task, input.bounds)) {
+      const finance = getDocumentFinanceSummary(task);
+      unpaidRevenue += finance.outstandingBalance;
+    }
   }
 
   revenue = roundMoney(revenue);
   expenses = roundMoney(expenses);
   paidRevenue = roundMoney(paidRevenue);
+  unpaidRevenue = roundMoney(unpaidRevenue);
   const profit = roundMoney(revenue - expenses);
-  const unpaidRevenue = roundMoney(Math.max(revenue - paidRevenue, 0));
 
   return {
     revenue,

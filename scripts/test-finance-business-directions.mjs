@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-const COMPLETED = ["COMPLETED", "DELIVERED"];
+const FINAL = ["COMPLETED", "DELIVERED"];
 
 function roundMoney(value) {
   return Math.round(value * 100) / 100;
@@ -10,25 +10,66 @@ function isWithinPeriod(date, { start, end }) {
   return date >= start && date <= end;
 }
 
+function derivePaymentStatus(paidAmount, servicePrice) {
+  const paid = Number(paidAmount ?? 0);
+  const price = Number(servicePrice ?? 0);
+  if (paid <= 0) return "unpaid";
+  if (price > 0 && paid < price) return "partially_paid";
+  if (price > 0 && paid >= price) return "paid";
+  return paid > 0 ? "partially_paid" : "unpaid";
+}
+
+function getRecognitionDate(task) {
+  if (task.completed_at) return task.completed_at.slice(0, 10);
+  if (task.delivered_at) return task.delivered_at.slice(0, 10);
+  if (task.ready_at) return task.ready_at.slice(0, 10);
+  if (FINAL.includes(task.status)) return task.updated_at.slice(0, 10);
+  return null;
+}
+
+function isRecognized(task, bounds) {
+  if (task.archived_at) return false;
+  if (task.status === "CANCELLED") return false;
+  if (!FINAL.includes(task.status)) return false;
+  if (derivePaymentStatus(task.paid_amount, task.service_price) !== "paid") {
+    return false;
+  }
+  const recognitionDate = getRecognitionDate(task);
+  if (!recognitionDate || !isWithinPeriod(recognitionDate, bounds)) return false;
+  return Number(task.service_price ?? 0) > 0 || Number(task.cost_price ?? 0) > 0;
+}
+
 function documentsSummary(tasks, bounds) {
   let revenue = 0;
   let expenses = 0;
   let paidRevenue = 0;
+  let unpaidRevenue = 0;
   let completedCount = 0;
 
   for (const task of tasks) {
-    if (task.archived_at) continue;
-    if (!COMPLETED.includes(task.status)) continue;
-    const completedAt = task.completed_at?.slice(0, 10);
-    if (!completedAt || !isWithinPeriod(completedAt, bounds)) continue;
-    const servicePrice = Number(task.service_price ?? 0);
-    const costPrice = Number(task.cost_price ?? 0);
-    if (!(servicePrice > 0 || costPrice > 0)) continue;
+    if (isRecognized(task, bounds)) {
+      const servicePrice = Number(task.service_price ?? 0);
+      const costPrice = Number(task.cost_price ?? 0);
+      revenue += servicePrice;
+      expenses += costPrice;
+      paidRevenue += servicePrice;
+      completedCount += 1;
+      continue;
+    }
 
-    revenue += servicePrice;
-    expenses += costPrice;
-    paidRevenue += Math.min(Number(task.paid_amount ?? 0), servicePrice);
-    completedCount += 1;
+    if (
+      !task.archived_at &&
+      FINAL.includes(task.status) &&
+      derivePaymentStatus(task.paid_amount, task.service_price) !== "paid"
+    ) {
+      const recognitionDate = getRecognitionDate(task);
+      if (recognitionDate && isWithinPeriod(recognitionDate, bounds)) {
+        unpaidRevenue += Math.max(
+          Number(task.service_price ?? 0) - Number(task.paid_amount ?? 0),
+          0
+        );
+      }
+    }
   }
 
   const profit = roundMoney(revenue - expenses);
@@ -37,7 +78,7 @@ function documentsSummary(tasks, bounds) {
     expenses: roundMoney(expenses),
     profit,
     paidRevenue: roundMoney(paidRevenue),
-    unpaidRevenue: roundMoney(Math.max(revenue - paidRevenue, 0)),
+    unpaidRevenue: roundMoney(unpaidRevenue),
     completedCount,
   };
 }
@@ -118,13 +159,14 @@ function check(label, condition) {
   check("detailing only combined", combinedResult(cards) === 6300);
 }
 
-// Documents only
+// Documents only — cash-completed
 {
   const docs = documentsSummary(
     [
       {
-        status: "COMPLETED",
-        completed_at: "2026-03-10",
+        status: "DELIVERED",
+        delivered_at: "2026-03-10T00:00:00.000Z",
+        updated_at: "2026-03-10T00:00:00.000Z",
         service_price: 3000,
         cost_price: 800,
         paid_amount: 3000,
@@ -157,10 +199,11 @@ function check(label, condition) {
       [
         {
           status: "DELIVERED",
-          completed_at: "2026-03-20",
+          delivered_at: "2026-03-20T00:00:00.000Z",
+          updated_at: "2026-03-20T00:00:00.000Z",
           service_price: 4000,
           cost_price: 1000,
-          paid_amount: 2000,
+          paid_amount: 4000,
         },
       ],
       bounds
@@ -184,6 +227,7 @@ function check(label, condition) {
       {
         status: "COMPLETED",
         completed_at: "2026-03-05",
+        updated_at: "2026-03-05T00:00:00.000Z",
         service_price: 1000,
         cost_price: 2500,
         paid_amount: 1000,
@@ -194,13 +238,14 @@ function check(label, condition) {
   check("negative documents profit", docs.profit === -1500);
 }
 
-// Unpaid completed documents
+// Unpaid final documents excluded from profit, counted as receivables
 {
   const docs = documentsSummary(
     [
       {
-        status: "COMPLETED",
-        completed_at: "2026-03-12",
+        status: "DELIVERED",
+        delivered_at: "2026-03-12T00:00:00.000Z",
+        updated_at: "2026-03-12T00:00:00.000Z",
         service_price: 6000,
         cost_price: 500,
         paid_amount: 0,
@@ -208,8 +253,9 @@ function check(label, condition) {
     ],
     bounds
   );
-  check("unpaid completed recognized", docs.completedCount === 1);
-  check("unpaid revenue split", docs.unpaidRevenue === 6000 && docs.paidRevenue === 0);
+  check("unpaid final excluded from profit count", docs.completedCount === 0);
+  check("unpaid final excluded from profit", docs.profit === 0);
+  check("unpaid revenue is receivables", docs.unpaidRevenue === 6000);
 }
 
 // Custom date range
@@ -218,15 +264,17 @@ function check(label, condition) {
   const docs = documentsSummary(
     [
       {
-        status: "COMPLETED",
-        completed_at: "2026-01-18",
+        status: "DELIVERED",
+        delivered_at: "2026-01-18T00:00:00.000Z",
+        updated_at: "2026-01-18T00:00:00.000Z",
         service_price: 2000,
         cost_price: 200,
         paid_amount: 2000,
       },
       {
-        status: "COMPLETED",
-        completed_at: "2026-02-01",
+        status: "DELIVERED",
+        delivered_at: "2026-02-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z",
         service_price: 9000,
         cost_price: 100,
         paid_amount: 9000,

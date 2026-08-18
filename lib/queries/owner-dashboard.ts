@@ -36,6 +36,8 @@ import {
   mapDetailingOrder,
 } from "@/lib/queries/detailing";
 import { loadOwnerAttentionData } from "@/lib/queries/owner-attention";
+import { getArchiveModuleCounts } from "@/lib/queries/archive-summary";
+import { getDetailingReceivablesSummary } from "@/lib/queries/detailing-receivables";
 import { getCurrentUserAccess, hasPermission, requirePermission } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -81,6 +83,7 @@ function emptyOwnerDashboard(dateRange: ResolvedDateRange): OwnerDashboardData {
       commissionCarsInStock: 0,
       documentsInProgress: 0,
       detailingOrdersToday: 0,
+      detailingReceivables: { unpaidOrderCount: 0, outstandingAmount: 0 },
       attentionCount: 0,
     },
     businessDirections: EMPTY_BUSINESS_DIRECTIONS,
@@ -112,6 +115,11 @@ function emptyOwnerDashboard(dateRange: ResolvedDateRange): OwnerDashboardData {
     },
     detailing: {
       stats: EMPTY_DETAILING_DASHBOARD_STATS,
+    },
+    archiveCounts: {
+      documents: 0,
+      detailing: 0,
+      deals: 0,
     },
     recentActivity: [],
     errors: {},
@@ -318,6 +326,7 @@ export async function getOwnerDashboardData(input?: {
     todayDetailingAppointments,
     detailingAttentionOrders,
     recentDetailingOrders,
+    detailingReceivablesResult,
   ] = await Promise.all([
     safeDetailingQuery(
       "getDetailingDashboardStats",
@@ -343,11 +352,24 @@ export async function getOwnerDashboardData(input?: {
       [],
       detailingWarnings
     ),
+    safeDetailingQuery(
+      "getDetailingReceivablesSummary",
+      getDetailingReceivablesSummary,
+      { summary: { unpaidOrderCount: 0, outstandingAmount: 0 }, error: false },
+      detailingWarnings
+    ),
   ]);
 
   if (detailingWarnings.length > 0) {
     errors.detailing = true;
   }
+  if (detailingReceivablesResult.error) {
+    errors.detailing = true;
+  }
+
+  const detailingReceivables = detailingReceivablesResult.error
+    ? { unpaidOrderCount: 0, outstandingAmount: 0 }
+    : detailingReceivablesResult.summary;
 
   let businessDirections = EMPTY_BUSINESS_DIRECTIONS;
   let businessDirectionComparisons: BusinessDirectionComparisons = {
@@ -404,6 +426,7 @@ export async function getOwnerDashboardData(input?: {
     cars: errors.cars ? [] : cars,
     tasks: errors.documents ? [] : tasks,
     detailingOrdersToday: detailingStats.todayAppointments,
+    detailingReceivables,
     attentionCount,
   });
 
@@ -468,6 +491,8 @@ export async function getOwnerDashboardData(input?: {
     errors.activity = true;
   }
 
+  const archiveCounts = await getArchiveModuleCounts();
+
   return {
     dateRange,
     period: resolveDashboardPeriod(dateRange),
@@ -486,6 +511,7 @@ export async function getOwnerDashboardData(input?: {
     detailing: {
       stats: detailingStats,
     },
+    archiveCounts,
     recentActivity,
     errors,
   };

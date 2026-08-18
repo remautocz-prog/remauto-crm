@@ -11,8 +11,15 @@ import {
   DEAL_PAYMENT_STATUSES,
   DEAL_STATUSES,
 } from "@/lib/constants/deals";
+import { archiveDealAction } from "@/lib/actions/deals";
 import { getClientDisplayName } from "@/lib/clients/validation";
 import { getClientLabelFromSnapshot, getVehicleLabelFromSnapshot } from "@/lib/deals/snapshots";
+import {
+  DEAL_LIST_SEGMENTS,
+  type DealListSegment,
+} from "@/lib/deals/list-segment";
+import { ArchivedBadge } from "@/components/shared/archived-badge";
+import { OrderArchiveRowActions } from "@/components/shared/order-archive-row-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,8 +40,10 @@ type DealsListProps = {
   initialPaymentStatus: string;
   initialPayer: string;
   initialAssignedTo: string;
-  initialArchived: boolean;
+  initialSegment: DealListSegment;
   initialFilter: string;
+  canArchive: boolean;
+  canRestoreArchived: boolean;
 };
 
 export function DealsList({
@@ -45,43 +54,49 @@ export function DealsList({
   initialPaymentStatus,
   initialPayer,
   initialAssignedTo,
-  initialArchived,
+  initialSegment,
   initialFilter,
+  canArchive,
+  canRestoreArchived,
 }: DealsListProps) {
   const t = useTranslations("deals");
+  const tArchive = useTranslations("archive");
   const tStatus = useTranslations("deals.status");
   const tPayment = useTranslations("deals.paymentStatuses");
   const tPayer = useTranslations("deals.payer");
   const router = useRouter();
-  const { formatCurrency, formatDate } = useFormatters();
+  const { formatCurrency, formatDate, formatDateTime } = useFormatters();
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState(initialStatus);
   const [paymentStatus, setPaymentStatus] = useState(initialPaymentStatus);
   const [payer, setPayer] = useState(initialPayer);
   const [assignedTo, setAssignedTo] = useState(initialAssignedTo);
-  const [archived, setArchived] = useState(initialArchived);
+  const [segment, setSegment] = useState<DealListSegment>(initialSegment);
 
-  function applyFilters() {
+  function applyFilters(nextSegment = segment) {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
     if (status) params.set("status", status);
     if (paymentStatus) params.set("payment_status", paymentStatus);
     if (payer) params.set("payer", payer);
     if (assignedTo) params.set("assigned_to", assignedTo);
-    if (archived) params.set("archived", "1");
+    if (nextSegment !== "active") params.set("segment", nextSegment);
     if (initialFilter) params.set("filter", initialFilter);
     startTransition(() => router.push(`/deals?${params.toString()}`));
   }
 
   const title = useMemo(() => {
+    if (segment === "archived") return tArchive("archivedOrders");
     if (initialFilter === "active") return t("activeDeals");
     if (initialFilter === "awaiting_payment") return t("awaitingPayment");
     if (initialFilter === "overdue") return t("overduePayments");
     if (initialFilter === "handovers_today") return t("handoversToday");
     if (initialFilter === "completed_month") return t("completedThisMonth");
     return t("deals");
-  }, [initialFilter, t]);
+  }, [initialFilter, segment, t, tArchive]);
+
+  const isArchivedView = segment === "archived";
 
   return (
     <div className="space-y-6">
@@ -90,12 +105,29 @@ export function DealsList({
           <h2 className="text-2xl font-bold text-white">{title}</h2>
           <p className="text-sm text-zinc-400">{deals.length} {t("deals").toLowerCase()}</p>
         </div>
-        <Button asChild>
-          <Link href="/deals/new">
-            <Plus className="h-4 w-4" />
-            {t("newDeal")}
-          </Link>
-        </Button>
+        {!isArchivedView ? (
+          <Button asChild>
+            <Link href="/deals/new">
+              <Plus className="h-4 w-4" />
+              {t("newDeal")}
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {DEAL_LIST_SEGMENTS.map((value) => (
+          <Button
+            key={value}
+            variant={segment === value ? "default" : "secondary"}
+            onClick={() => {
+              setSegment(value);
+              applyFilters(value);
+            }}
+          >
+            {tArchive(`segment.${value}` as "segment.active")}
+          </Button>
+        ))}
       </div>
 
       <Card className="border-zinc-800 bg-zinc-900/60">
@@ -141,11 +173,7 @@ export function DealsList({
               ))}
             </SelectContent>
           </Select>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} />
-            {t("showArchived")}
-          </label>
-          <Button onClick={applyFilters} disabled={isPending}>
+          <Button onClick={() => applyFilters()} disabled={isPending}>
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {t("applyFilters")}
           </Button>
@@ -155,7 +183,7 @@ export function DealsList({
       {deals.length === 0 ? (
         <Card className="border-zinc-800 bg-zinc-900/60">
           <CardContent className="py-10 text-center text-sm text-zinc-400">
-            {t("noDeals")}
+            {isArchivedView ? tArchive("archiveEmpty") : t("noDeals")}
           </CardContent>
         </Card>
       ) : (
@@ -174,15 +202,15 @@ export function DealsList({
             const vehicleB = deal.vehicle_b
               ? `${deal.vehicle_b.brand} ${deal.vehicle_b.model}`
               : getVehicleLabelFromSnapshot(deal.vehicle_b_snapshot);
+            const archived = Boolean(deal.archived_at);
 
             return (
-              <Link
+              <div
                 key={deal.id}
-                href={`/deals/${deal.id}`}
-                className="block rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 transition hover:border-zinc-700"
+                className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 transition hover:border-zinc-700"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 space-y-1">
+                  <Link href={`/deals/${deal.id}`} className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-white">{deal.deal_number}</span>
                       <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
@@ -191,31 +219,49 @@ export function DealsList({
                       <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
                         {tPayment(deal.payment_status)}
                       </span>
+                      {archived ? <ArchivedBadge /> : null}
                     </div>
-                    <p className="text-sm text-zinc-300">{clientLabel}</p>
+                    <p className="mt-1 text-sm text-zinc-300">{clientLabel}</p>
                     <p className="text-xs text-zinc-500">
                       {t("vehicleA")}: {vehicleA} · {t("vehicleB")}: {vehicleB}
                     </p>
-                  </div>
-                  <div className="text-sm text-zinc-400 lg:text-right">
-                    <p>
-                      {t("additionalPayment")}:{" "}
-                      {deal.additional_payment
-                        ? `${formatCurrency(deal.additional_payment)} ${deal.currency}`
-                        : t("noAdditionalPayment")}
-                    </p>
-                    {deal.additional_payment_payer ? (
-                      <p>{tPayer(deal.additional_payment_payer)}</p>
+                    {archived ? (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {tArchive("archivedAt")}: {formatDateTime(deal.archived_at, "—")}
+                      </p>
                     ) : null}
-                    {deal.signing_date ? (
-                      <p>{t("signingDate")}: {formatDate(deal.signing_date)}</p>
+                  </Link>
+                  <div className="flex items-start gap-2 lg:flex-col lg:items-end">
+                    <div className="text-sm text-zinc-400 lg:text-right">
+                      <p>
+                        {t("additionalPayment")}:{" "}
+                        {deal.additional_payment
+                          ? `${formatCurrency(deal.additional_payment)} ${deal.currency}`
+                          : t("noAdditionalPayment")}
+                      </p>
+                      {deal.signing_date ? (
+                        <p>{t("signingDate")}: {formatDate(deal.signing_date)}</p>
+                      ) : null}
+                      <p className="text-xs text-zinc-500">
+                        {deal.assignee?.full_name ?? t("unassigned")} · {formatDate(deal.created_at)}
+                      </p>
+                    </div>
+                    {(canArchive || canRestoreArchived) ? (
+                      <OrderArchiveRowActions
+                        entityName={deal.deal_number}
+                        isArchived={archived}
+                        canArchive={canArchive && !archived}
+                        canRestore={canRestoreArchived && archived}
+                        canPermanentlyDelete={false}
+                        onArchive={() => archiveDealAction(deal.id, true)}
+                        onRestore={() => archiveDealAction(deal.id, false)}
+                        archiveLabel={t("archiveDeal")}
+                        restoreLabel={t("restoreDeal")}
+                      />
                     ) : null}
-                    <p className="text-xs text-zinc-500">
-                      {deal.assignee?.full_name ?? t("unassigned")} · {formatDate(deal.created_at)}
-                    </p>
                   </div>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

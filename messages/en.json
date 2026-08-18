@@ -21,6 +21,28 @@
     "archivedResult": "Archived",
     "openRelatedRecord": "Open"
   },
+  "archive": {
+    "archive": "Archive",
+    "archived": "Archived",
+    "restore": "Restore",
+    "archivedAt": "Archived at",
+    "archivedBy": "Archived by",
+    "archiveOrder": "Archive order",
+    "restoreOrder": "Restore order",
+    "archiveConfirm": "Archive {name}? The record stays in the archive and can be restored later.",
+    "permanentDeleteConfirm": "Delete {name} permanently? This action cannot be undone.",
+    "archiveEmpty": "Archive is empty",
+    "archiveEmptyHint": "Archived orders will appear here.",
+    "viewArchive": "View archive",
+    "archivedOrders": "Archived orders",
+    "alreadyArchived": "This record is already archived.",
+    "notArchived": "This record is not archived.",
+    "segment": {
+      "active": "Active",
+      "completed": "Completed",
+      "archived": "Archived"
+    }
+  },
   "nav": {
     "dashboard": "Dashboard",
     "adminDashboard": "Operations",
@@ -50,6 +72,7 @@
     "add": "Add",
     "backToList": "Back to list",
     "backToCard": "Back to details",
+    "actions": "Actions",
     "confirmSale": "Confirm sale",
     "markAsSold": "Mark as sold",
     "deleteCar": "Delete car",
@@ -231,6 +254,8 @@
       "monthlyProfit": "Monthly profit",
       "realizedProfit": "Realized profit",
       "detailingToday": "Detailing today",
+      "unpaidDetailing": "Unpaid detailing",
+      "unpaidDetailingOrdersHint": "{count, plural, one {# order} other {# orders}}",
       "profitTrend": "Profit trend",
       "profitByDirection": "Profit by direction",
       "last30Days": "Last 30 days",
@@ -265,8 +290,8 @@
       "attentionReasonDocumentOverdueHighPriority": "Overdue by {days} days · High priority",
       "attentionReasonDocumentDueToday": "Due today",
       "attentionReasonDocumentHighPrioritySoon": "High priority · due in {days} days",
-      "attentionReasonDetailingUnpaid": "Delivered · payment unpaid",
-      "attentionReasonDetailingPartiallyPaid": "Delivered · partially paid",
+      "attentionReasonDetailingUnpaid": "Outstanding customer balance",
+      "attentionReasonDetailingPartiallyPaid": "Partially paid balance",
       "attentionReasonDetailingReady": "Ready for delivery",
       "attentionReasonDetailingReadyWaiting": "Ready for delivery · waiting {days} days",
       "attentionReasonDetailingOverdueCompletion": "Planned completion overdue by {days} days",
@@ -333,7 +358,12 @@
       "attentionDetailingUnpaid": "Unpaid detailing orders",
       "attentionDetailingReady": "Ready for delivery",
       "attentionDocumentsOverdue": "Overdue document tasks",
-      "attentionActiveMissingSalePrice": "Active cars without sale price"
+      "attentionActiveMissingSalePrice": "Active cars without sale price",
+      "archiveSummaryTitle": "Archive",
+      "archiveSummaryHint": "Archived records by module",
+      "archiveDocuments": "Documents",
+      "archiveDetailing": "Detailing",
+      "archiveDeals": "Deals"
     },
     "admin": {
       "title": "Admin dashboard",
@@ -342,6 +372,7 @@
       "overdueDocuments": "Overdue documents",
       "detailingInProgress": "Detailing in progress",
       "unpaidDetailing": "Unpaid detailing",
+      "unpaidDetailingOrdersHint": "{count, plural, one {# order} other {# orders}}",
       "carsRequiringAction": "Cars requiring action",
       "today": "Today",
       "teamWorkload": "Team workload",
@@ -380,8 +411,8 @@
       "attentionReasonDocumentOverdueHighPriority": "Overdue by {days} days · High priority",
       "attentionReasonDocumentDueToday": "Due today",
       "attentionReasonDocumentHighPrioritySoon": "High priority · due in {days} days",
-      "attentionReasonDetailingUnpaid": "Delivered · payment unpaid",
-      "attentionReasonDetailingPartiallyPaid": "Delivered · partially paid",
+      "attentionReasonDetailingUnpaid": "Outstanding customer balance",
+      "attentionReasonDetailingPartiallyPaid": "Partially paid balance",
       "attentionReasonDetailingReady": "Ready for delivery",
       "attentionReasonDetailingReadyWaiting": "Ready for delivery · waiting {days} days",
       "attentionReasonDetailingOverdueCompletion": "Planned completion overdue by {days} days",
@@ -1167,7 +1198,7 @@
     "notesPlaceholder": "Special requests, paint condition, access instructions…",
     "sectionDescriptions": {
       "customer": "Name and phone, or mark as internal vehicle.",
-      "vehicle": "Make, registration and size for surcharge calculation.",
+      "vehicle": "Select a CRM vehicle or enter make, registration and size for surcharge calculation.",
       "services": "Tap services to add — assign an employee per service.",
       "appointment": "When the customer brings the vehicle in.",
       "employee": "Who performs the work and earns commission.",
@@ -1215,6 +1246,14 @@
     "noRecentOrders": "No orders yet.",
     "internalVehicle": "Internal RemAuto vehicle",
     "internalVehicleHint": "Customer details are optional for internal company vehicles.",
+    "carSelector": {
+      "label": "CRM vehicle",
+      "placeholder": "Select vehicle",
+      "loading": "Loading cars…",
+      "noCarsFound": "No cars found",
+      "searchPlaceholder": "Search by VIN, plate, brand or model",
+      "loadFailed": "CRM vehicles could not be loaded. Enter vehicle details manually below."
+    },
     "manualPriceOverride": "Final price manually overridden",
     "calculatedPrice": "Calculated price",
     "verifyPriceHint": "Verify or enter the final price",
@@ -1351,7 +1390,8 @@
       "finalPrice": "Final price",
       "remaining": "Remaining",
       "payment": "Payment",
-      "status": "Status"
+      "status": "Status",
+      "actions": "Actions"
     },
     "vehicleSizes": {
       "standard": "Standard sedan/coupe (0%)",

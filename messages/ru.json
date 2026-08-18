@@ -21,6 +21,28 @@
     "archivedResult": "Архив",
     "openRelatedRecord": "Открыть"
   },
+  "archive": {
+    "archive": "Архивировать",
+    "archived": "Архив",
+    "restore": "Восстановить",
+    "archivedAt": "Архивировано",
+    "archivedBy": "Архивировал",
+    "archiveOrder": "Архивировать заказ",
+    "restoreOrder": "Восстановить заказ",
+    "archiveConfirm": "Архивировать {name}? Запись останется в архиве и её можно будет восстановить.",
+    "permanentDeleteConfirm": "Удалить {name} навсегда? Это действие нельзя отменить.",
+    "archiveEmpty": "Архив пуст",
+    "archiveEmptyHint": "Архивные заказы будут отображаться здесь.",
+    "viewArchive": "Открыть архив",
+    "archivedOrders": "Архивные заказы",
+    "alreadyArchived": "Запись уже в архиве.",
+    "notArchived": "Запись не в архиве.",
+    "segment": {
+      "active": "Активные",
+      "completed": "Завершённые",
+      "archived": "Архив"
+    }
+  },
   "nav": {
     "dashboard": "Главная",
     "adminDashboard": "Операции",
@@ -50,6 +72,7 @@
     "add": "Добавить",
     "backToList": "Назад к списку",
     "backToCard": "Назад к карточке",
+    "actions": "Действия",
     "confirmSale": "Подтвердить продажу",
     "markAsSold": "Отметить проданным",
     "deleteCar": "Удалить автомобиль",
@@ -231,6 +254,8 @@
       "monthlyProfit": "Прибыль за месяц",
       "realizedProfit": "Реализованная прибыль",
       "detailingToday": "Детейлинг сегодня",
+      "unpaidDetailing": "Неоплаченный детейлинг",
+      "unpaidDetailingOrdersHint": "{count, plural, one {# заказ} few {# заказа} many {# заказов} other {# заказа}}",
       "profitTrend": "Динамика прибыли",
       "profitByDirection": "Прибыль по направлениям",
       "last30Days": "Последние 30 дней",
@@ -265,8 +290,8 @@
       "attentionReasonDocumentOverdueHighPriority": "Просрочено на {days} дн. · высокий приоритет",
       "attentionReasonDocumentDueToday": "Срок сегодня",
       "attentionReasonDocumentHighPrioritySoon": "Высокий приоритет · срок через {days} дн.",
-      "attentionReasonDetailingUnpaid": "Выдан · не оплачен",
-      "attentionReasonDetailingPartiallyPaid": "Выдан · частично оплачен",
+      "attentionReasonDetailingUnpaid": "Неоплаченный остаток клиента",
+      "attentionReasonDetailingPartiallyPaid": "Частично оплаченный остаток",
       "attentionReasonDetailingReady": "Готов к выдаче",
       "attentionReasonDetailingReadyWaiting": "Готов к выдаче · ожидает {days} дн.",
       "attentionReasonDetailingOverdueCompletion": "Плановое завершение просрочено на {days} дн.",
@@ -333,7 +358,12 @@
       "attentionDetailingUnpaid": "Неоплаченные заказы",
       "attentionDetailingReady": "Готово к выдаче",
       "attentionDocumentsOverdue": "Просроченные документы",
-      "attentionActiveMissingSalePrice": "Активные авто без цены продажи"
+      "attentionActiveMissingSalePrice": "Активные авто без цены продажи",
+      "archiveSummaryTitle": "Архив",
+      "archiveSummaryHint": "Архивные записи по модулям",
+      "archiveDocuments": "Документы",
+      "archiveDetailing": "Детейлинг",
+      "archiveDeals": "Сделки"
     },
     "admin": {
       "title": "Панель администратора",
@@ -342,6 +372,7 @@
       "overdueDocuments": "Просроченные документы",
       "detailingInProgress": "Детейлинг в работе",
       "unpaidDetailing": "Неоплаченный детейлинг",
+      "unpaidDetailingOrdersHint": "{count, plural, one {# заказ} few {# заказа} many {# заказов} other {# заказа}}",
       "carsRequiringAction": "Авто, требующие действий",
       "today": "Сегодня",
       "teamWorkload": "Нагрузка команды",
@@ -380,8 +411,8 @@
       "attentionReasonDocumentOverdueHighPriority": "Просрочено на {days} дн. · Высокий приоритет",
       "attentionReasonDocumentDueToday": "Срок сегодня",
       "attentionReasonDocumentHighPrioritySoon": "Высокий приоритет · срок через {days} дн.",
-      "attentionReasonDetailingUnpaid": "Выдано · не оплачено",
-      "attentionReasonDetailingPartiallyPaid": "Выдано · частично оплачено",
+      "attentionReasonDetailingUnpaid": "Неоплаченный остаток клиента",
+      "attentionReasonDetailingPartiallyPaid": "Частично оплаченный остаток",
       "attentionReasonDetailingReady": "Готово к выдаче",
       "attentionReasonDetailingReadyWaiting": "Готово к выдаче · ожидает {days} дн.",
       "attentionReasonDetailingOverdueCompletion": "Плановое завершение просрочено на {days} дн.",
@@ -1167,7 +1198,7 @@
     "notesPlaceholder": "Особые пожелания, состояние ЛКП, инструкции по доступу…",
     "sectionDescriptions": {
       "customer": "Имя и телефон или отметьте как служебное авто.",
-      "vehicle": "Марка, номер и размер для расчёта надбавки.",
+      "vehicle": "Выберите автомобиль CRM или укажите марку, номер и размер для расчёта надбавки.",
       "services": "Выберите услуги и назначьте сотрудника для каждой.",
       "appointment": "Когда клиент привезёт автомобиль.",
       "employee": "Кто выполняет работу и получает комиссию.",
@@ -1215,6 +1246,14 @@
     "noRecentOrders": "Заказов пока нет.",
     "internalVehicle": "Внутренний автомобиль RemAuto",
     "internalVehicleHint": "Для внутренних автомобилей компании данные клиента необязательны.",
+    "carSelector": {
+      "label": "Автомобиль CRM",
+      "placeholder": "Выберите автомобиль",
+      "loading": "Загрузка автомобилей…",
+      "noCarsFound": "Автомобили не найдены",
+      "searchPlaceholder": "Поиск по VIN, номеру, марке или модели",
+      "loadFailed": "Не удалось загрузить автомобили CRM. Введите данные вручную ниже."
+    },
     "manualPriceOverride": "Итоговая цена изменена вручную",
     "calculatedPrice": "Рассчитанная цена",
     "verifyPriceHint": "Проверьте или введите итоговую цену",
@@ -1351,7 +1390,8 @@
       "finalPrice": "Итог",
       "remaining": "Остаток",
       "payment": "Оплата",
-      "status": "Статус"
+      "status": "Статус",
+      "actions": "Действия"
     },
     "vehicleSizes": {
       "standard": "Стандарт sedan/coupe (0%)",

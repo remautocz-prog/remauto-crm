@@ -21,6 +21,28 @@
     "archivedResult": "Archiv",
     "openRelatedRecord": "Otevřít"
   },
+  "archive": {
+    "archive": "Archivovat",
+    "archived": "Archivováno",
+    "restore": "Obnovit",
+    "archivedAt": "Archivováno",
+    "archivedBy": "Archivoval",
+    "archiveOrder": "Archivovat objednávku",
+    "restoreOrder": "Obnovit objednávku",
+    "archiveConfirm": "Archivovat {name}? Záznam zůstane v archivu a lze jej obnovit.",
+    "permanentDeleteConfirm": "Trvale smazat {name}? Tuto akci nelze vrátit.",
+    "archiveEmpty": "Archiv je prázdný",
+    "archiveEmptyHint": "Archivované objednávky se zobrazí zde.",
+    "viewArchive": "Zobrazit archiv",
+    "archivedOrders": "Archivované objednávky",
+    "alreadyArchived": "Záznam je již archivován.",
+    "notArchived": "Záznam není archivován.",
+    "segment": {
+      "active": "Aktivní",
+      "completed": "Dokončené",
+      "archived": "Archiv"
+    }
+  },
   "nav": {
     "dashboard": "Přehled",
     "adminDashboard": "Operace",
@@ -50,6 +72,7 @@
     "add": "Přidat",
     "backToList": "Zpět na seznam",
     "backToCard": "Zpět na kartu",
+    "actions": "Akce",
     "confirmSale": "Potvrdit prodej",
     "markAsSold": "Označit jako prodané",
     "deleteCar": "Smazat vozidlo",
@@ -231,6 +254,8 @@
       "monthlyProfit": "Měsíční zisk",
       "realizedProfit": "Realizovaný zisk",
       "detailingToday": "Detailing dnes",
+      "unpaidDetailing": "Neuhrazený detailing",
+      "unpaidDetailingOrdersHint": "{count, plural, one {# objednávka} few {# objednávky} many {# objednávek} other {# objednávky}}",
       "profitTrend": "Vývoj zisku",
       "profitByDirection": "Zisk podle směru",
       "last30Days": "Posledních 30 dní",
@@ -265,8 +290,8 @@
       "attentionReasonDocumentOverdueHighPriority": "Po termínu {days} dní · vysoká priorita",
       "attentionReasonDocumentDueToday": "Termín dnes",
       "attentionReasonDocumentHighPrioritySoon": "Vysoká priorita · termín za {days} dní",
-      "attentionReasonDetailingUnpaid": "Předáno · neuhrazeno",
-      "attentionReasonDetailingPartiallyPaid": "Předáno · částečně uhrazeno",
+      "attentionReasonDetailingUnpaid": "Neuhrazený zůstatek zákazníka",
+      "attentionReasonDetailingPartiallyPaid": "Částečně uhrazený zůstatek",
       "attentionReasonDetailingReady": "Připraveno k předání",
       "attentionReasonDetailingReadyWaiting": "Připraveno k předání · čeká {days} dní",
       "attentionReasonDetailingOverdueCompletion": "Plánované dokončení po termínu {days} dní",
@@ -333,7 +358,12 @@
       "attentionDetailingUnpaid": "Neuhrazené detailingové objednávky",
       "attentionDetailingReady": "Připraveno k předání",
       "attentionDocumentsOverdue": "Dokumenty po termínu",
-      "attentionActiveMissingSalePrice": "Aktivní vozidla bez prodejní ceny"
+      "attentionActiveMissingSalePrice": "Aktivní vozidla bez prodejní ceny",
+      "archiveSummaryTitle": "Archiv",
+      "archiveSummaryHint": "Archivované záznamy podle modulu",
+      "archiveDocuments": "Dokumenty",
+      "archiveDetailing": "Detailing",
+      "archiveDeals": "Obchody"
     },
     "admin": {
       "title": "Admin přehled",
@@ -342,6 +372,7 @@
       "overdueDocuments": "Dokumenty po termínu",
       "detailingInProgress": "Detailing probíhá",
       "unpaidDetailing": "Neuhrazený detailing",
+      "unpaidDetailingOrdersHint": "{count, plural, one {# objednávka} few {# objednávky} many {# objednávek} other {# objednávky}}",
       "carsRequiringAction": "Vozidla vyžadující akci",
       "today": "Dnes",
       "teamWorkload": "Zatížení týmu",
@@ -380,8 +411,8 @@
       "attentionReasonDocumentOverdueHighPriority": "Po termínu {days} dní · Vysoká priorita",
       "attentionReasonDocumentDueToday": "Termín dnes",
       "attentionReasonDocumentHighPrioritySoon": "Vysoká priorita · termín za {days} dní",
-      "attentionReasonDetailingUnpaid": "Dodáno · neuhrazeno",
-      "attentionReasonDetailingPartiallyPaid": "Dodáno · částečně uhrazeno",
+      "attentionReasonDetailingUnpaid": "Neuhrazený zůstatek zákazníka",
+      "attentionReasonDetailingPartiallyPaid": "Částečně uhrazený zůstatek",
       "attentionReasonDetailingReady": "Připraveno k předání",
       "attentionReasonDetailingReadyWaiting": "Připraveno k předání · čeká {days} dní",
       "attentionReasonDetailingOverdueCompletion": "Plánované dokončení po termínu {days} dní",
@@ -1167,7 +1198,7 @@
     "notesPlaceholder": "Speciální požadavky, stav laku, instrukce k přístupu…",
     "sectionDescriptions": {
       "customer": "Jméno a telefon, nebo označte interní vozidlo.",
-      "vehicle": "Značka, SPZ a velikost pro výpočet příplatku.",
+      "vehicle": "Vyberte vozidlo CRM nebo zadejte značku, SPZ a velikost pro výpočet příplatku.",
       "services": "Vyberte služby a přiřaďte ke každé zaměstnance.",
       "appointment": "Kdy zákazník přiveze vozidlo.",
       "employee": "Kdo práci provede a získá provizi.",
@@ -1215,6 +1246,14 @@
     "noRecentOrders": "Zatím žádné objednávky.",
     "internalVehicle": "Interní vozidlo RemAuto",
     "internalVehicleHint": "U interních firemních vozidel jsou údaje o zákazníkovi volitelné.",
+    "carSelector": {
+      "label": "Vozidlo CRM",
+      "placeholder": "Vyberte vozidlo",
+      "loading": "Načítání vozidel…",
+      "noCarsFound": "Žádná vozidla nenalezena",
+      "searchPlaceholder": "Hledat podle VIN, SPZ, značky nebo modelu",
+      "loadFailed": "Vozidla CRM se nepodařilo načíst. Zadejte údaje ručně níže."
+    },
     "manualPriceOverride": "Konečná cena ručně upravena",
     "calculatedPrice": "Vypočtená cena",
     "verifyPriceHint": "Ověřte nebo zadejte konečnou cenu",
@@ -1351,7 +1390,8 @@
       "finalPrice": "Cena",
       "remaining": "Zbývá",
       "payment": "Platba",
-      "status": "Stav"
+      "status": "Stav",
+      "actions": "Akce"
     },
     "vehicleSizes": {
       "standard": "Standard sedan/kupé (0 %)",

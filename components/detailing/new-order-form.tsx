@@ -37,7 +37,12 @@ import type {
   DetailingOrderPrefill,
   DetailingService,
 } from "@/lib/types/detailing";
+import type { DetailingCarSelectorOption } from "@/lib/detailing/car-selector";
 import type { DetailingQueryWarning } from "@/lib/detailing/query-utils";
+import {
+  DetailingVehicleSection,
+  isDetailingVehicleSectionComplete,
+} from "@/components/detailing/detailing-vehicle-section";
 import {
   DetailingServicePicker,
   type ServiceLine,
@@ -60,11 +65,10 @@ import { cn } from "@/lib/utils";
 type DetailingNewOrderFormProps = {
   services: DetailingService[];
   employees: DetailingEmployeeWithProfile[];
+  cars: DetailingCarSelectorOption[];
   warnings?: DetailingQueryWarning[];
   prefill?: DetailingOrderPrefill | null;
 };
-
-const VEHICLE_SIZES: DetailingVehicleSize[] = ["standard", "suv", "xxl"];
 
 function SectionIcon({ done }: { done: boolean }) {
   return done ? (
@@ -77,6 +81,7 @@ function SectionIcon({ done }: { done: boolean }) {
 export function DetailingNewOrderForm({
   services,
   employees,
+  cars,
   warnings = [],
   prefill = null,
 }: DetailingNewOrderFormProps) {
@@ -90,6 +95,7 @@ export function DetailingNewOrderForm({
   const [isInternalVehicle, setIsInternalVehicle] = useState(
     prefill?.isInternalVehicle ?? false
   );
+  const [carId, setCarId] = useState<number | null>(prefill?.carId ?? null);
   const [customerFirstName, setCustomerFirstName] = useState(
     prefill?.customerFirstName ?? ""
   );
@@ -120,6 +126,9 @@ export function DetailingNewOrderForm({
   );
   const servicesLoadFailed = warnings.some((warning) =>
     warning.query.includes("getDetailingServices")
+  );
+  const carsLoadFailed = warnings.some((warning) =>
+    warning.query.includes("getDetailingCarSelectorOptions")
   );
 
   const pricing = useMemo(
@@ -170,7 +179,12 @@ export function DetailingNewOrderForm({
       );
     return {
       customer: hasCustomer,
-      vehicle: Boolean(vehicleMakeModel.trim() && registrationNumber.trim()),
+      vehicle: isDetailingVehicleSectionComplete({
+        isInternalVehicle,
+        carId,
+        vehicleMakeModel,
+        registrationNumber,
+      }),
       services: lines.length > 0,
       appointment: Boolean(appointmentDate && appointmentTime),
       employee: true,
@@ -179,6 +193,7 @@ export function DetailingNewOrderForm({
     };
   }, [
     isInternalVehicle,
+    carId,
     customerFirstName,
     customerLastName,
     customerPhone,
@@ -210,7 +225,7 @@ export function DetailingNewOrderForm({
         customer_last_name: isInternalVehicle ? null : customerLastName,
         customer_phone: isInternalVehicle ? null : customerPhone,
         is_internal_vehicle: isInternalVehicle,
-        car_id: prefill?.carId ?? null,
+        car_id: isInternalVehicle ? carId : null,
         vehicle_make_model: vehicleMakeModel,
         registration_number: registrationNumber,
         vehicle_size: vehicleSize,
@@ -420,7 +435,13 @@ export function DetailingNewOrderForm({
                   type="checkbox"
                   className="mt-1 rounded border-zinc-600 bg-zinc-900"
                   checked={isInternalVehicle}
-                  onChange={(e) => setIsInternalVehicle(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsInternalVehicle(checked);
+                    if (!checked) {
+                      setCarId(null);
+                    }
+                  }}
                 />
                 <span>
                   <span className="flex items-center gap-2 font-medium text-white">
@@ -477,50 +498,24 @@ export function DetailingNewOrderForm({
             action={<SectionIcon done={sectionStatus.vehicle} />}
           >
             <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="makeModel">{t("fields.makeModel")} *</Label>
-                  <Input
-                    id="makeModel"
-                    value={vehicleMakeModel}
-                    onChange={(e) => setVehicleMakeModel(e.target.value)}
-                    placeholder="BMW X5, Škoda Octavia…"
-                    className="bg-zinc-950/60"
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="registration">{t("fields.registration")} *</Label>
-                  <Input
-                    id="registration"
-                    value={registrationNumber}
-                    onChange={(e) => setRegistrationNumber(e.target.value.toUpperCase())}
-                    placeholder="1AB 2345"
-                    className="bg-zinc-950/60 uppercase"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>{t("fields.vehicleSize")}</Label>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {VEHICLE_SIZES.map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => setVehicleSize(size)}
-                      className={cn(
-                        "rounded-xl border px-4 py-3 text-left text-sm transition",
-                        vehicleSize === size
-                          ? "border-red-500/60 bg-red-500/10 text-white ring-1 ring-red-500/30"
-                          : "border-zinc-800 bg-zinc-950/40 text-zinc-300 hover:border-zinc-700"
-                      )}
-                    >
-                      {t(`vehicleSizes.${size}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {carsLoadFailed ? (
+                <p className="rounded-lg border border-amber-600/30 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
+                  {t("carSelector.loadFailed")}
+                </p>
+              ) : null}
+              <DetailingVehicleSection
+                isInternalVehicle={isInternalVehicle}
+                cars={cars}
+                carsLoading={false}
+                carId={carId}
+                onCarIdChange={setCarId}
+                vehicleMakeModel={vehicleMakeModel}
+                onVehicleMakeModelChange={setVehicleMakeModel}
+                registrationNumber={registrationNumber}
+                onRegistrationNumberChange={setRegistrationNumber}
+                vehicleSize={vehicleSize}
+                onVehicleSizeChange={setVehicleSize}
+              />
             </div>
           </DetailingSection>
 

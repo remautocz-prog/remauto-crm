@@ -226,6 +226,7 @@ export type DealsListParams = {
   date_from?: string;
   date_to?: string;
   archived?: boolean;
+  segment?: "active" | "archived";
   filter?: string;
 };
 

@@ -6,14 +6,10 @@ import {
 } from "@/lib/dashboard/owner-attention";
 import { getPragueTodayDateString } from "@/lib/documents/deadline";
 import {
-  DETAILING_ORDER_SELECT,
-  hydrateDetailingOrdersWithServices,
-} from "@/lib/detailing/order-services-loader";
-import {
   mapDocumentTask,
   mergeTaskRelations,
 } from "@/lib/documents/helpers";
-import { mapDetailingOrder } from "@/lib/queries/detailing";
+import { loadActiveDetailingOrdersForReceivables } from "@/lib/queries/detailing-receivables";
 import { createClient } from "@/lib/supabase/server";
 import type { Car } from "@/lib/types/cars";
 import type { DetailingOrderWithServices } from "@/lib/types/detailing";
@@ -99,38 +95,7 @@ async function loadDetailingAttentionOrders(): Promise<{
   orders: DetailingOrderWithServices[];
   error: boolean;
 }> {
-  const supabase = await createClient();
-  const today = getPragueTodayDateString();
-
-  const { data, error } = await supabase
-    .from("detailing_orders")
-    .select(DETAILING_ORDER_SELECT)
-    .is("archived_at", null)
-    .neq("status", "cancelled")
-    .or(
-      [
-        "status.eq.ready",
-        "and(status.eq.delivered,or(payment_status.eq.unpaid,payment_status.eq.partially_paid))",
-        `and(status.in.(scheduled,in_progress),expected_completion_at.lt.${today}T00:00:00.000Z)`,
-        `and(status.eq.scheduled,appointment_date.lt.${today})`,
-        "and(status.eq.delivered,car_id.not.is.null)",
-      ].join(",")
-    )
-    .order("updated_at", { ascending: true })
-    .limit(120);
-
-  if (error) {
-    return { orders: [], error: true };
-  }
-
-  try {
-    const orders = await hydrateDetailingOrdersWithServices(
-      (data ?? []).map((row) => mapDetailingOrder(row as Record<string, unknown>))
-    );
-    return { orders, error: false };
-  } catch {
-    return { orders: [], error: true };
-  }
+  return loadActiveDetailingOrdersForReceivables();
 }
 
 async function loadDetailingExpenseOrderIds(): Promise<Set<string>> {

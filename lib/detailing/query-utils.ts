@@ -143,6 +143,11 @@ export async function verifyDetailingDatabaseReadiness(): Promise<DetailingReadi
   return { ready, checks, missingTables };
 }
 
+function isSupabaseQueryError(error: unknown): error is SupabaseQueryError {
+  if (typeof error !== "object" || error === null) return false;
+  return "message" in error || "code" in error;
+}
+
 export function toQueryWarning(error: unknown, query = "unknown"): DetailingQueryWarning {
   if (error instanceof DetailingQueryError) {
     return {
@@ -153,6 +158,13 @@ export function toQueryWarning(error: unknown, query = "unknown"): DetailingQuer
   }
   if (error instanceof Error) {
     return { query, message: error.message };
+  }
+  if (isSupabaseQueryError(error)) {
+    return {
+      query,
+      message: error.message ?? "Unknown detailing query error",
+      code: error.code,
+    };
   }
   return { query, message: "Unknown detailing query error" };
 }

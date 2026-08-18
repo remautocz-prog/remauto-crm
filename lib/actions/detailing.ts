@@ -38,11 +38,13 @@ import type { DetailingOrderFormInput, DetailingOrderServiceInput, DetailingServ
 import type { UserAccess } from "@/lib/auth/types";
 import {
   guardAuthenticated,
+  guardPermanentDelete,
   guardPermission,
   getPermissionDeniedMessage,
 } from "@/lib/auth/action-guard";
 import { hasPermission } from "@/lib/auth/permissions";
 import { isOrderRelevantToEmployee } from "@/lib/detailing/employee-dashboard";
+import { formatDeleteActionError } from "@/lib/utils/action-errors";
 import { formatSupabaseError, type ActionResult } from "@/lib/utils/errors";
 
 function revalidateDetailingPaths(orderId?: string) {
@@ -322,7 +324,7 @@ export async function updateDetailingOrderAction(
         customer_phone: input.customer_phone?.trim() || null,
         vehicle_make_model: input.vehicle_make_model.trim(),
         registration_number: input.registration_number.trim(),
-        car_id: input.car_id ?? existing.car_id ?? null,
+        car_id: input.car_id !== undefined ? input.car_id : existing.car_id ?? null,
         vehicle_size: input.vehicle_size,
         surcharge_percent_snapshot: financials.surchargePercent,
         appointment_date: input.appointment_date,
@@ -752,6 +754,106 @@ export async function updateDetailingServiceAction(input: {
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+export async function archiveDetailingOrderAction(orderId: string): Promise<ActionResult> {
+  const denied = await guardPermission("detailing.update");
+  if (denied) return denied;
+
+  const access = await guardAuthenticated();
+  if ("success" in access && access.success === false) {
+    return access;
+  }
+  const userAccess = access as UserAccess;
+
+  const existing = await getDetailingOrderById(orderId);
+  if (!existing) {
+    const t = await getTranslations("detailing");
+    return { success: false, error: t("orderNotFound") };
+  }
+
+  if (existing.archived_at) {
+    const t = await getTranslations("archive");
+    return { success: false, error: t("alreadyArchived") };
+  }
+
+  if (
+    userAccess.role === "detailing" &&
+    !isOrderRelevantToEmployee(existing, userAccess.userId)
+  ) {
+    return { success: false, error: await getPermissionDeniedMessage() };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("detailing_orders")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", orderId);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidateDetailingPaths(orderId);
+  return { success: true };
+}
+
+export async function restoreDetailingOrderAction(orderId: string): Promise<ActionResult> {
+  const denied = await guardPermission("detailing.update");
+  if (denied) return denied;
+
+  const existing = await getDetailingOrderById(orderId);
+  if (!existing) {
+    const t = await getTranslations("detailing");
+    return { success: false, error: t("orderNotFound") };
+  }
+
+  if (!existing.archived_at) {
+    const t = await getTranslations("archive");
+    return { success: false, error: t("notArchived") };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("detailing_orders")
+    .update({ archived_at: null })
+    .eq("id", orderId);
+
+  if (error) {
+    return { success: false, error: await formatSupabaseError(error) };
+  }
+
+  revalidateDetailingPaths(orderId);
+  return { success: true };
+}
+
+export async function deleteDetailingOrderAction(orderId: string): Promise<ActionResult> {
+  const denied = await guardPermanentDelete();
+  if (denied) return denied;
+
+  const t = await getTranslations("detailing");
+  const existing = await getDetailingOrderById(orderId);
+  if (!existing) {
+    return { success: false, error: t("orderNotFound") };
+  }
+
+  const supabase = await createClient();
+  const { error: servicesError } = await supabase
+    .from("detailing_order_services")
+    .delete()
+    .eq("order_id", orderId);
+
+  if (servicesError) {
+    return { success: false, error: await formatDeleteActionError(servicesError) };
+  }
+
+  const { error } = await supabase.from("detailing_orders").delete().eq("id", orderId);
+  if (error) {
+    return { success: false, error: await formatDeleteActionError(error) };
+  }
+
+  revalidateDetailingPaths(orderId);
+  return { success: true };
 }
 
 export async function buildServiceLineFromCatalogue(

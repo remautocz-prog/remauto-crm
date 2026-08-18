@@ -13,6 +13,10 @@ import {
   isTaskDueTomorrow,
 } from "@/lib/documents/employee-dashboard";
 import { isTaskDueToday, isTaskOverdue } from "@/lib/documents/helpers";
+import {
+  isDetailingPartiallyPaidReceivable,
+  isDetailingReceivableOrder,
+} from "@/lib/detailing/receivables";
 import { getDocumentVehicleTitle } from "@/lib/documents/vehicle";
 import type { Car } from "@/lib/types/cars";
 import type { DetailingOrderWithServices } from "@/lib/types/detailing";
@@ -275,32 +279,23 @@ export function buildOwnerAttentionRows(input: {
       },
     };
 
-    if (
-      order.status === "delivered" &&
-      order.payment_status === "unpaid"
-    ) {
+    if (isDetailingReceivableOrder(order)) {
+      const partiallyPaid = isDetailingPartiallyPaidReceivable(order);
       upsertAttentionItem(map, {
         ...base,
-        id: attentionKey("detailing", order.id, "detailing_unpaid"),
-        reasonCategory: "detailing_unpaid",
-        priority: "critical",
-        reasonKey: "attentionReasonDetailingUnpaid",
-        sortTimestamp: order.actual_completion_at ?? order.updated_at,
-      });
-      continue;
-    }
-
-    if (
-      order.status === "delivered" &&
-      order.payment_status === "partially_paid"
-    ) {
-      upsertAttentionItem(map, {
-        ...base,
-        id: attentionKey("detailing", order.id, "detailing_partially_paid"),
-        reasonCategory: "detailing_partially_paid",
-        priority: "high",
-        reasonKey: "attentionReasonDetailingPartiallyPaid",
-        sortTimestamp: order.actual_completion_at ?? order.updated_at,
+        id: attentionKey(
+          "detailing",
+          order.id,
+          partiallyPaid ? "detailing_partially_paid" : "detailing_unpaid"
+        ),
+        reasonCategory: partiallyPaid
+          ? "detailing_partially_paid"
+          : "detailing_unpaid",
+        priority: partiallyPaid ? "high" : "critical",
+        reasonKey: partiallyPaid
+          ? "attentionReasonDetailingPartiallyPaid"
+          : "attentionReasonDetailingUnpaid",
+        sortTimestamp: order.updated_at,
       });
       continue;
     }

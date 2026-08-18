@@ -6,11 +6,13 @@ import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
   Car,
+  ClipboardList,
   FileText,
   Sparkles,
   TrendingUp,
   Wallet,
 } from "lucide-react";
+import { getDetailingFilterHref } from "@/lib/dashboard/links";
 import type { OwnerDashboardData } from "@/lib/types/owner-dashboard";
 import { DateRangeSelector } from "@/components/shared/date-range-selector";
 import { buildDateRangeHref } from "@/lib/date-range/filter";
@@ -129,6 +131,17 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
       icon: Sparkles,
       tone: "detailing" as const,
       href: "/detailing",
+    },
+    {
+      id: "unpaid-detailing",
+      label: t("unpaidDetailing"),
+      value: formatCurrency(data.topCards.detailingReceivables.outstandingAmount),
+      hint: t("unpaidDetailingOrdersHint", {
+        count: data.topCards.detailingReceivables.unpaidOrderCount,
+      }),
+      icon: ClipboardList,
+      tone: "attention" as const,
+      href: getDetailingFilterHref({ paymentOutstanding: true }),
     },
     {
       id: "requires-attention",
@@ -375,6 +388,42 @@ export function OwnerDashboard({ data, userName }: OwnerDashboardProps) {
         attention={data.attention}
         quickActions={data.attentionQuickActions}
       />
+
+      <section className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-base font-semibold text-white">{t("archiveSummaryTitle")}</h3>
+          <span className="text-xs text-zinc-500">{t("archiveSummaryHint")}</span>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Link
+            href="/documents?segment=archived"
+            className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-4 py-3 transition-colors hover:border-zinc-700"
+          >
+            <p className="text-sm text-zinc-400">{t("archiveDocuments")}</p>
+            <p className="mt-1 text-2xl font-semibold text-white">
+              {formatNumber(data.archiveCounts.documents)}
+            </p>
+          </Link>
+          <Link
+            href="/detailing/orders?segment=archived"
+            className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-4 py-3 transition-colors hover:border-zinc-700"
+          >
+            <p className="text-sm text-zinc-400">{t("archiveDetailing")}</p>
+            <p className="mt-1 text-2xl font-semibold text-white">
+              {formatNumber(data.archiveCounts.detailing)}
+            </p>
+          </Link>
+          <Link
+            href="/deals?segment=archived"
+            className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-4 py-3 transition-colors hover:border-zinc-700"
+          >
+            <p className="text-sm text-zinc-400">{t("archiveDeals")}</p>
+            <p className="mt-1 text-2xl font-semibold text-white">
+              {formatNumber(data.archiveCounts.deals)}
+            </p>
+          </Link>
+        </div>
+      </section>
 
       <div className="mt-8">
         <OwnerRecentActivity

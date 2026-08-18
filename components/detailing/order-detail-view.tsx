@@ -19,9 +19,17 @@ import type {
   DetailingOrderWithServices,
   DetailingService,
 } from "@/lib/types/detailing";
+import type { DetailingCarSelectorOption } from "@/lib/detailing/car-selector";
 import { DetailingOrderForm } from "@/components/detailing/order-form";
 import { DetailingStatusBadge } from "@/components/detailing/status-badge";
 import { DetailingSection, DetailingTable } from "@/components/detailing/detailing-section";
+import { ArchivedBadge } from "@/components/shared/archived-badge";
+import { OrderArchiveRowActions } from "@/components/shared/order-archive-row-actions";
+import {
+  archiveDetailingOrderAction,
+  deleteDetailingOrderAction,
+  restoreDetailingOrderAction,
+} from "@/lib/actions/detailing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddDetailingCostDialog } from "@/components/cars/add-detailing-cost-dialog";
@@ -33,7 +41,12 @@ type DetailingOrderDetailViewProps = {
   order: DetailingOrderWithServices;
   services: DetailingService[];
   employees: DetailingEmployeeWithProfile[];
+  cars?: DetailingCarSelectorOption[];
+  carsLoadFailed?: boolean;
   linkedCarExpense?: CarExpense | null;
+  canArchive?: boolean;
+  canRestoreArchived?: boolean;
+  canPermanentlyDelete?: boolean;
 };
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -49,9 +62,15 @@ export function DetailingOrderDetailView({
   order,
   services,
   employees,
+  cars = [],
+  carsLoadFailed = false,
   linkedCarExpense = null,
+  canArchive = false,
+  canRestoreArchived = false,
+  canPermanentlyDelete = false,
 }: DetailingOrderDetailViewProps) {
   const t = useTranslations("detailing");
+  const tArchive = useTranslations("archive");
   const router = useRouter();
   const { formatCurrency, formatDate, formatDateTime } = useFormatters();
   const [isPending, startTransition] = useTransition();
@@ -65,6 +84,7 @@ export function DetailingOrderDetailView({
     !hasServiceLevelAssignments(order.services) && Boolean(order.assigned_employee_id);
   const isDelivered = order.status === "delivered";
   const isCancelled = order.status === "cancelled";
+  const isArchived = Boolean(order.archived_at);
 
   function changeStatus(status: DetailingOrderStatus) {
     startTransition(async () => {
@@ -88,6 +108,8 @@ export function DetailingOrderDetailView({
         <DetailingOrderForm
           services={services}
           employees={employees}
+          cars={cars}
+          carsLoadFailed={carsLoadFailed}
           order={order}
           compact
           onSuccess={() => {
@@ -107,6 +129,7 @@ export function DetailingOrderDetailView({
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-bold text-white">{order.order_number}</h2>
             <DetailingStatusBadge status={order.status} />
+            {isArchived ? <ArchivedBadge /> : null}
           </div>
           <p className="mt-1 text-sm text-zinc-400">
             {order.vehicle_make_model} · {order.registration_number}
@@ -128,13 +151,36 @@ export function DetailingOrderDetailView({
             </p>
           ) : null}
         </div>
-        <Button variant="outline" onClick={() => setEditing(true)}>
-          <Pencil className="mr-2 h-4 w-4" />
-          {t("editOrder")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isArchived ? (
+            <Button variant="outline" onClick={() => setEditing(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              {t("editOrder")}
+            </Button>
+          ) : null}
+          {(canArchive || canRestoreArchived || canPermanentlyDelete) ? (
+            <OrderArchiveRowActions
+              entityName={order.order_number}
+              isArchived={isArchived}
+              canArchive={canArchive && !isArchived}
+              canRestore={canRestoreArchived && isArchived}
+              canPermanentlyDelete={canPermanentlyDelete && isArchived}
+              onArchive={() => archiveDetailingOrderAction(order.id)}
+              onRestore={() => restoreDetailingOrderAction(order.id)}
+              onPermanentDelete={() => deleteDetailingOrderAction(order.id)}
+              navigateAfterDelete="/detailing/orders?segment=archived"
+            />
+          ) : null}
+        </div>
       </div>
 
-      {!isCancelled && !isDelivered ? (
+      {isArchived ? (
+        <p className="text-sm text-zinc-400">
+          {tArchive("archivedAt")}: {formatDateTime(order.archived_at, "—")}
+        </p>
+      ) : null}
+
+      {!isArchived && !isCancelled && !isDelivered ? (
         <div className="flex flex-wrap gap-2">
           {order.status === "scheduled" ? (
             <Button onClick={() => changeStatus("in_progress")} disabled={isPending}>

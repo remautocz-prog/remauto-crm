@@ -31,6 +31,15 @@ export function getDocumentsFilterHref(filter: {
   return query ? `/documents?${query}` : "/documents";
 }
 
+export function getDetailingFilterHref(filter: { paymentOutstanding?: boolean }) {
+  const params = new URLSearchParams();
+  if (filter.paymentOutstanding) {
+    params.set("payment", "unpaid");
+  }
+  const query = params.toString();
+  return query ? `/detailing/orders?${query}` : "/detailing/orders";
+}
+
 export function getDealsFilterHref(filter: {
   active?: boolean;
   unsignedPrepared?: boolean;

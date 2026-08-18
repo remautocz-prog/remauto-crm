@@ -4,9 +4,8 @@ import {
   shouldCountStatsProfit,
 } from "@/lib/cars/business-rules";
 import { getDocumentFinanceSummary } from "@/lib/documents/helpers";
-import {
-  isRecognizedDocumentTaskForFinance,
-} from "@/lib/finance/documents-summary";
+import { getDocumentTaskRecognitionDate } from "@/lib/documents/finance-recognition";
+import { isRecognizedDocumentTaskForFinance } from "@/lib/finance/documents-summary";
 import { resolveOrderCommissionTotal } from "@/lib/detailing/finance-aggregation";
 import {
   bucketDateForChart,
@@ -194,9 +193,9 @@ export function buildProfitTrendSeries(input: {
     if (!isRecognizedDocumentTaskForFinance(task, { start: input.rangeStart, end: input.rangeEnd })) {
       continue;
     }
-    const completedAt = task.completed_at?.slice(0, 10);
-    if (!completedAt) continue;
-    addProfit(completedAt, computeDocumentTaskProfit(task));
+    const recognitionDate = getDocumentTaskRecognitionDate(task);
+    if (!recognitionDate) continue;
+    addProfit(recognitionDate, computeDocumentTaskProfit(task));
   }
 
   return bucketKeys.map((date) => ({

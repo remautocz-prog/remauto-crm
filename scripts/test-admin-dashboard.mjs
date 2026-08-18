@@ -59,6 +59,34 @@ function hasPermission(role, permission) {
   return map[role]?.has(permission) ?? false;
 }
 
+function summarizeDetailingReceivables(orders) {
+  let unpaidOrderCount = 0;
+  let outstandingAmount = 0;
+
+  for (const order of orders) {
+    if (order.archived_at || order.status === "cancelled" || order.final_price <= 0) {
+      continue;
+    }
+    const outstanding = Math.max(order.final_price - Math.max(order.paid_amount, 0), 0);
+    if (outstanding <= 0) continue;
+    unpaidOrderCount += 1;
+    outstandingAmount += outstanding;
+  }
+
+  return { unpaidOrderCount, outstandingAmount };
+}
+
+function computeOperationalKpis(input) {
+  const detailingReceivables = summarizeDetailingReceivables(input.orders);
+  return {
+    requiresAttention: countRequiresAttention(input.attentionItems),
+    overdueDocuments: 0,
+    detailingInProgress: input.orders.filter((order) => order.status === "in_progress").length,
+    detailingReceivables,
+    carsRequiringAction: 0,
+  };
+}
+
 let passed = 0;
 function check(label, condition) {
   assert.ok(condition, label);
@@ -107,5 +135,40 @@ const stuckSource = Array.from({ length: 8 }, (_, index) => ({
 const stuck = buildStuckProcessItems(stuckSource, 8);
 check("stuck processes skip entities already in attention top", stuck.length === 1);
 check("stuck keeps non-visible entity", stuck[0]?.entityId === "99");
+
+const receivableOrders = [
+  {
+    id: "1",
+    status: "in_progress",
+    final_price: 20_000,
+    paid_amount: 0,
+    archived_at: null,
+  },
+  {
+    id: "2",
+    status: "ready",
+    final_price: 20_000,
+    paid_amount: 5_000,
+    archived_at: null,
+  },
+  {
+    id: "3",
+    status: "delivered",
+    final_price: 20_000,
+    paid_amount: 20_000,
+    archived_at: null,
+  },
+];
+
+const kpis = computeOperationalKpis({
+  attentionItems: [],
+  orders: receivableOrders,
+});
+
+check("admin unpaid KPI counts receivable orders", kpis.detailingReceivables.unpaidOrderCount === 2);
+check(
+  "admin unpaid KPI sums outstanding CZK",
+  kpis.detailingReceivables.outstandingAmount === 35_000
+);
 
 console.log(`admin dashboard checks: ${passed} assertions passed`);

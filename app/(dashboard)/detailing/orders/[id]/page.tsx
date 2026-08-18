@@ -5,8 +5,12 @@ import { getTranslations } from "next-intl/server";
 import { DetailingOrderDetailView } from "@/components/detailing/order-detail-view";
 import { DetailingDatabaseNotReady } from "@/components/detailing/database-not-ready";
 import { DetailingQueryWarnings } from "@/components/detailing/detailing-query-warnings";
+import { getCurrentUserAccess } from "@/lib/auth/access";
+import { canPermanentlyDelete, hasPermission } from "@/lib/auth/permissions";
 import { runDetailingPageSafe } from "@/lib/detailing/page-loader";
+import { safeDetailingQuery } from "@/lib/detailing/query-utils";
 import { getCarExpenseByDetailingOrderId } from "@/lib/queries/cars";
+import { getDetailingCarSelectorOptions } from "@/lib/queries/detailing-car-selector";
 import {
   getDetailingEmployees,
   getDetailingOrderById,
@@ -50,6 +54,21 @@ export default async function DetailingOrderDetailPage({ params }: PageProps) {
 
   if (!order) notFound();
 
+  const carWarnings = [...result.warnings];
+  const cars = await safeDetailingQuery(
+    "getDetailingCarSelectorOptions",
+    () => getDetailingCarSelectorOptions({ linkedCarId: order.car_id }),
+    [],
+    carWarnings
+  );
+
+  const access = await getCurrentUserAccess();
+  const role = access?.role ?? "inactive";
+  const canArchive = hasPermission(role, "detailing.update");
+  const canRestoreArchived =
+    canArchive && (role === "owner" || role === "admin");
+  const showPermanentDelete = canPermanentlyDelete(role);
+
   let linkedCarExpense = null;
   if (order.car_id) {
     try {
@@ -61,7 +80,7 @@ export default async function DetailingOrderDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-4">
-      <DetailingQueryWarnings warnings={result.warnings} />
+      <DetailingQueryWarnings warnings={[...result.warnings, ...carWarnings]} />
       <Button asChild variant="outline" size="sm">
         <Link href="/detailing/orders">{t("backToOrders")}</Link>
       </Button>
@@ -69,7 +88,14 @@ export default async function DetailingOrderDetailPage({ params }: PageProps) {
         order={order}
         services={services}
         employees={employees}
+        cars={cars}
+        carsLoadFailed={carWarnings.some((warning) =>
+          warning.query.includes("getDetailingCarSelectorOptions")
+        )}
         linkedCarExpense={linkedCarExpense}
+        canArchive={canArchive}
+        canRestoreArchived={canRestoreArchived}
+        canPermanentlyDelete={showPermanentDelete}
       />
     </div>
   );

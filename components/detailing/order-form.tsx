@@ -36,6 +36,10 @@ import type {
   DetailingOrderWithServices,
   DetailingService,
 } from "@/lib/types/detailing";
+import type { DetailingCarSelectorOption } from "@/lib/detailing/car-selector";
+import {
+  DetailingVehicleSection,
+} from "@/components/detailing/detailing-vehicle-section";
 import { DetailingServicePicker, type ServiceLine } from "@/components/detailing/service-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +58,8 @@ import { useFormatters } from "@/lib/hooks/use-formatters";
 type DetailingOrderFormProps = {
   services: DetailingService[];
   employees: DetailingEmployeeWithProfile[];
+  cars?: DetailingCarSelectorOption[];
+  carsLoadFailed?: boolean;
   order?: DetailingOrderWithServices;
   compact?: boolean;
   onSuccess?: () => void;
@@ -63,6 +69,8 @@ type DetailingOrderFormProps = {
 export function DetailingOrderForm({
   services,
   employees,
+  cars = [],
+  carsLoadFailed = false,
   order,
   compact,
   onSuccess,
@@ -76,11 +84,13 @@ export function DetailingOrderForm({
   const [submitted, setSubmitted] = useState(false);
 
   const isInternalDefault =
-    !order?.customer_first_name &&
-    !order?.customer_last_name &&
-    !order?.customer_phone;
+    Boolean(order?.car_id) ||
+    (!order?.customer_first_name &&
+      !order?.customer_last_name &&
+      !order?.customer_phone);
 
   const [isInternalVehicle, setIsInternalVehicle] = useState(isInternalDefault);
+  const [carId, setCarId] = useState<number | null>(order?.car_id ?? null);
   const [customerFirstName, setCustomerFirstName] = useState(order?.customer_first_name ?? "");
   const [customerLastName, setCustomerLastName] = useState(order?.customer_last_name ?? "");
   const [customerPhone, setCustomerPhone] = useState(order?.customer_phone ?? "");
@@ -175,6 +185,7 @@ export function DetailingOrderForm({
         customer_last_name: isInternalVehicle ? null : customerLastName,
         customer_phone: isInternalVehicle ? null : customerPhone,
         is_internal_vehicle: isInternalVehicle,
+        car_id: isInternalVehicle ? carId : null,
         vehicle_make_model: vehicleMakeModel,
         registration_number: registrationNumber,
         vehicle_size: vehicleSize,
@@ -241,7 +252,13 @@ export function DetailingOrderForm({
               type="checkbox"
               className="mt-0.5 rounded border-zinc-600"
               checked={isInternalVehicle}
-              onChange={(e) => setIsInternalVehicle(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setIsInternalVehicle(checked);
+                if (!checked) {
+                  setCarId(null);
+                }
+              }}
             />
             <span>
               <span className="font-medium text-white">{t("internalVehicle")}</span>
@@ -271,26 +288,25 @@ export function DetailingOrderForm({
 
       <Card className="border-zinc-800 bg-zinc-900/60">
         <CardHeader><CardTitle className="text-base font-semibold text-white">{t("sections.vehicle")}</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="makeModel">{t("fields.makeModel")} *</Label>
-            <Input id="makeModel" value={vehicleMakeModel} onChange={(e) => setVehicleMakeModel(e.target.value)} required />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="registration">{t("fields.registration")} *</Label>
-            <Input id="registration" value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} required />
-          </div>
-          <div className="space-y-1 sm:col-span-3">
-            <Label>{t("fields.vehicleSize")}</Label>
-            <Select value={vehicleSize} onValueChange={(v) => setVehicleSize(v as DetailingVehicleSize)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="standard">{t("vehicleSizes.standard")}</SelectItem>
-                <SelectItem value="suv">{t("vehicleSizes.suv")}</SelectItem>
-                <SelectItem value="xxl">{t("vehicleSizes.xxl")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <CardContent className="space-y-3">
+          {carsLoadFailed ? (
+            <p className="rounded-lg border border-amber-600/30 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
+              {t("carSelector.loadFailed")}
+            </p>
+          ) : null}
+          <DetailingVehicleSection
+            isInternalVehicle={isInternalVehicle}
+            cars={cars}
+            carId={carId}
+            onCarIdChange={setCarId}
+            vehicleMakeModel={vehicleMakeModel}
+            onVehicleMakeModelChange={setVehicleMakeModel}
+            registrationNumber={registrationNumber}
+            onRegistrationNumberChange={setRegistrationNumber}
+            vehicleSize={vehicleSize}
+            onVehicleSizeChange={setVehicleSize}
+            vehicleSizeVariant="select"
+          />
         </CardContent>
       </Card>
 

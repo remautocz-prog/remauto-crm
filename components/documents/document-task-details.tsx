@@ -216,7 +216,13 @@ export function DocumentTaskDetails({
             <PermanentDeleteButton
               label={tAccess("deletePermanently")}
               description={t("deleteTaskDescription", { id: task.id })}
-              onConfirm={() => deleteDocumentTaskAction(task.id)}
+              onConfirm={async () => {
+                const result = await deleteDocumentTaskAction(task.id);
+                if (result.success) {
+                  router.push("/documents");
+                }
+                return result;
+              }}
             />
           ) : null}
         </div>

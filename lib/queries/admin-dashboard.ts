@@ -12,10 +12,8 @@ import {
 } from "@/lib/dashboard/admin-team-workload";
 import { ACTIVE_DETAILING_ORDER_STATUSES } from "@/lib/constants/detailing";
 import { ACTIVE_DOCUMENT_TASK_STATUSES } from "@/lib/constants/documents";
-import {
-  DETAILING_ORDER_SELECT,
-  hydrateDetailingOrdersWithServices,
-} from "@/lib/detailing/order-services-loader";
+import { summarizeDetailingReceivables } from "@/lib/detailing/receivables";
+import { loadActiveDetailingOrdersForReceivables } from "@/lib/queries/detailing-receivables";
 import { getPragueTodayDateString } from "@/lib/documents/deadline";
 import {
   isTaskActiveForDeadline,
@@ -27,7 +25,6 @@ import {
 import { sortOverdueTasks } from "@/lib/dashboard/owner-metrics";
 import {
   getTodayDetailingAppointments,
-  mapDetailingOrder,
 } from "@/lib/queries/detailing";
 import { loadOwnerAttentionData } from "@/lib/queries/owner-attention";
 import { createClient } from "@/lib/supabase/server";
@@ -36,7 +33,6 @@ import type {
   AdminDashboardData,
   AdminDashboardSectionErrors,
   AdminOperationalKpis,
-  AdminOptionalFinanceKpis,
 } from "@/lib/types/admin-dashboard";
 import type { DetailingOrderWithServices } from "@/lib/types/detailing";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
@@ -98,25 +94,7 @@ async function loadDetailingOrdersForAdmin(): Promise<{
   orders: DetailingOrderWithServices[];
   error: boolean;
 }> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("detailing_orders")
-    .select(DETAILING_ORDER_SELECT)
-    .is("archived_at", null)
-    .neq("status", "cancelled")
-    .order("updated_at", { ascending: false })
-    .limit(500);
-
-  if (error) return { orders: [], error: true };
-
-  try {
-    const orders = await hydrateDetailingOrdersWithServices(
-      (data ?? []).map((row) => mapDetailingOrder(row as Record<string, unknown>))
-    );
-    return { orders, error: false };
-  } catch {
-    return { orders: [], error: true };
-  }
+  return loadActiveDetailingOrdersForReceivables();
 }
 
 async function loadCarsSaleToday(today: string): Promise<{
@@ -177,12 +155,7 @@ function computeOperationalKpis(input: {
 
   const detailingInProgress = input.orders.filter(isActiveDetailingOrder).length;
 
-  const unpaidDetailing = input.orders.filter(
-    (order) =>
-      order.status === "delivered" &&
-      (order.payment_status === "unpaid" ||
-        order.payment_status === "partially_paid")
-  ).length;
+  const detailingReceivables = summarizeDetailingReceivables(input.orders);
 
   const carsRequiringAction = input.attentionItems.filter(
     (item) =>
@@ -196,24 +169,9 @@ function computeOperationalKpis(input: {
     requiresAttention: countAdminRequiresAttention(input.attentionItems),
     overdueDocuments,
     detailingInProgress,
-    unpaidDetailing,
+    detailingReceivables,
     carsRequiringAction,
   };
-}
-
-function computeOptionalFinanceKpis(
-  orders: DetailingOrderWithServices[]
-): AdminOptionalFinanceKpis {
-  const unpaidDetailingBalance = orders
-    .filter(
-      (order) =>
-        order.status === "delivered" &&
-        (order.payment_status === "unpaid" ||
-          order.payment_status === "partially_paid")
-    )
-    .reduce((sum, order) => sum + (order.remaining_amount ?? 0), 0);
-
-  return { unpaidDetailingBalance };
 }
 
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
@@ -254,14 +212,6 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     orders,
     today,
   });
-
-  const canViewFinance = userAccess
-    ? hasPermission(userAccess.role, "finance.view")
-    : false;
-
-  const optionalFinance = canViewFinance
-    ? computeOptionalFinanceKpis(orders)
-    : null;
 
   const attentionQuickActions = {
     documentsStatus: userAccess
@@ -324,7 +274,6 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
   return {
     kpis,
-    optionalFinance,
     attention,
     attentionQuickActions,
     today: {

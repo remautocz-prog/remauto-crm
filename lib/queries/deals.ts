@@ -194,7 +194,11 @@ export async function getDeals(params: DealsListParams = {}) {
   const supabase = await createClient();
   let query = supabase.from("deals").select(DEAL_SELECT).order("created_at", { ascending: false });
 
-  if (!params.archived) {
+  if (params.segment === "archived") {
+    query = query.not("archived_at", "is", null);
+  } else if (params.archived) {
+    // Legacy include-archived toggle: show all deals.
+  } else {
     query = query.is("archived_at", null);
   }
 

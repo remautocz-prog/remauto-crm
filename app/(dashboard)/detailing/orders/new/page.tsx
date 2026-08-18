@@ -30,13 +30,15 @@ export default async function NewDetailingOrderPage({
       ? await loadDetailingOrderPrefill(carId)
       : null;
 
-  const result = await runDetailingPage(loadNewDetailingOrderPageData);
+  const result = await runDetailingPage(() =>
+    loadNewDetailingOrderPageData({ linkedCarId: prefill?.carId ?? null })
+  );
 
   if (result.blocked) {
     return <DetailingDatabaseNotReady readiness={result.readiness} />;
   }
 
-  const { services, employees, warnings } = result.data;
+  const { services, employees, cars, warnings } = result.data;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -65,6 +67,7 @@ export default async function NewDetailingOrderPage({
       <DetailingNewOrderForm
         services={services}
         employees={employees}
+        cars={cars}
         warnings={warnings}
         prefill={prefill}
       />

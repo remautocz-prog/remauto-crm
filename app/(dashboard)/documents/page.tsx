@@ -4,7 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { DocumentsList } from "@/components/documents/documents-list";
 import { LoadingScreen } from "@/components/shared/loading-screen";
 import { getCurrentUserAccess } from "@/lib/auth/access";
-import { hasPermission } from "@/lib/auth/permissions";
+import { canPermanentlyDelete, hasPermission } from "@/lib/auth/permissions";
 import { parseDocumentListSegment } from "@/lib/documents/list-segment";
 import { getClientOptions, getProfileOptions } from "@/lib/queries/cars";
 import {
@@ -97,6 +97,7 @@ async function DocumentsPageContent({
   const showArchiveMetadata = hasPermission(role, "users.view");
   const canRestoreArchived = hasPermission(role, "documents.archive");
   const canArchive = hasPermission(role, "documents.archive");
+  const showPermanentDelete = canPermanentlyDelete(role);
 
   const [tasks, clients, cars, profiles, filterOptions] = await Promise.all([
     getDocumentTasksForList({
@@ -145,6 +146,7 @@ async function DocumentsPageContent({
       showArchiveMetadata={showArchiveMetadata}
       canRestoreArchived={canRestoreArchived}
       canArchive={canArchive}
+      canPermanentlyDelete={showPermanentDelete}
       initialClientId={
         initialClientId != null && !Number.isNaN(initialClientId) ? initialClientId : null
       }

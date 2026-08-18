@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { TERMINAL_DOCUMENT_TASK_STATUSES } from "@/lib/constants/documents";
 import { buildChecklistForService } from "@/lib/documents/checklists";
@@ -673,7 +672,7 @@ export async function deleteDocumentTaskAction(id: number): Promise<ActionResult
   revalidatePath("/finance");
   if (existing.client_id) revalidatePath(`/clients/${existing.client_id}`);
   if (existing.car_id) revalidatePath(`/cars/${existing.car_id}`);
-  redirect("/documents");
+  return { success: true };
 }
 
 export async function getDocumentTaskAction(id: number) {

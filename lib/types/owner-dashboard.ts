@@ -1,3 +1,4 @@
+import type { DetailingReceivablesSummary } from "@/lib/detailing/receivables";
 import type {
   ProfitDirectionBar,
   ProfitTrendPoint,
@@ -29,6 +30,7 @@ export type OwnerTopCards = {
   commissionCarsInStock: number;
   documentsInProgress: number;
   detailingOrdersToday: number;
+  detailingReceivables: DetailingReceivablesSummary;
   attentionCount: number;
 };
 
@@ -64,6 +66,7 @@ export type OwnerDashboardData = {
   charts: OwnerChartsData;
   today: OwnerTodaySection;
   detailing: OwnerDetailingSummary;
+  archiveCounts: import("@/lib/queries/archive-summary").ArchiveModuleCounts;
   recentActivity: DashboardActivityItem[];
   errors: OwnerDashboardSectionErrors;
 };

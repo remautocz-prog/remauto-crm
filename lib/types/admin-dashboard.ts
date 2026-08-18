@@ -1,3 +1,4 @@
+import type { DetailingReceivablesSummary } from "@/lib/detailing/receivables";
 import type { AdminTeamWorkloadRow } from "@/lib/dashboard/admin-team-workload";
 import type { OwnerAttentionRow } from "@/lib/dashboard/owner-attention";
 import type { OwnerAttentionLoadResult } from "@/lib/queries/owner-attention";
@@ -9,12 +10,8 @@ export type AdminOperationalKpis = {
   requiresAttention: number;
   overdueDocuments: number;
   detailingInProgress: number;
-  unpaidDetailing: number;
+  detailingReceivables: DetailingReceivablesSummary;
   carsRequiringAction: number;
-};
-
-export type AdminOptionalFinanceKpis = {
-  unpaidDetailingBalance: number;
 };
 
 export type AdminTodaySection = {
@@ -35,7 +32,6 @@ export type AdminDashboardSectionErrors = {
 
 export type AdminDashboardData = {
   kpis: AdminOperationalKpis;
-  optionalFinance: AdminOptionalFinanceKpis | null;
   attention: OwnerAttentionLoadResult;
   attentionQuickActions: {
     documentsStatus: boolean;

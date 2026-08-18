@@ -1,3 +1,4 @@
+import { isDetailingReceivableOrder } from "@/lib/detailing/receivables";
 import { syncDetailingEmployeesFromProfiles } from "@/lib/detailing/employee-sync";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -40,6 +41,8 @@ export type DetailingOrdersListParams = {
   date_from?: string;
   date_to?: string;
   include_archived?: boolean;
+  segment?: "active" | "archived";
+  outstanding_only?: boolean;
 };
 
 async function mapOrderRowsWithServices(
@@ -175,7 +178,11 @@ export async function getDetailingOrders(params: DetailingOrdersListParams = {})
     .order("appointment_date", { ascending: false })
     .order("appointment_time", { ascending: false });
 
-  if (!params.include_archived) {
+  if (params.segment === "archived") {
+    query = query.not("archived_at", "is", null);
+  } else if (params.include_archived) {
+    // Legacy: include archived alongside active rows.
+  } else {
     query = query.is("archived_at", null);
   }
   if (params.status && params.status !== "all") {
@@ -215,6 +222,10 @@ export async function getDetailingOrders(params: DetailingOrdersListParams = {})
         .toLowerCase();
       return haystack.includes(term);
     });
+  }
+
+  if (params.outstanding_only) {
+    orders = orders.filter((order) => isDetailingReceivableOrder(order));
   }
 
   return orders;

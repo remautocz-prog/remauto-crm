@@ -21,6 +21,7 @@ import type { OwnerAttentionRow } from "@/lib/dashboard/owner-attention";
 import { getDocumentVehicleTitle } from "@/lib/documents/vehicle";
 import { getCustomerDisplayName } from "@/lib/detailing/validation";
 import { useFormatters } from "@/lib/hooks/use-formatters";
+import { getDetailingFilterHref } from "@/lib/dashboard/links";
 import type { AdminDashboardData } from "@/lib/types/admin-dashboard";
 import type { Car as CarRecord } from "@/lib/types/cars";
 import type { DetailingOrderWithServices } from "@/lib/types/detailing";
@@ -252,11 +253,13 @@ export function AdminDashboard({ data, userName }: AdminDashboardProps) {
     {
       id: "unpaid-detailing",
       label: t("unpaidDetailing"),
-      value: formatNumber(data.kpis.unpaidDetailing),
-      hint: t("currentSnapshotHint"),
+      value: formatCurrency(data.kpis.detailingReceivables.outstandingAmount),
+      hint: t("unpaidDetailingOrdersHint", {
+        count: data.kpis.detailingReceivables.unpaidOrderCount,
+      }),
       icon: ClipboardList,
       tone: "attention" as const,
-      href: "/detailing?payment=unpaid",
+      href: getDetailingFilterHref({ paymentOutstanding: true }),
     },
     {
       id: "cars-requiring-action",
@@ -329,19 +332,6 @@ export function AdminDashboard({ data, userName }: AdminDashboardProps) {
           <OwnerKpiCard key={card.id} {...card} />
         ))}
       </div>
-
-      {data.optionalFinance ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-xl">
-          <OwnerKpiCard
-            label={t("unpaidDetailingBalance")}
-            value={formatCurrency(data.optionalFinance.unpaidDetailingBalance)}
-            hint={t("financeCompactHint")}
-            icon={ClipboardList}
-            tone="attention"
-            href="/detailing?payment=unpaid"
-          />
-        </div>
-      ) : null}
 
       <OwnerAttentionSection
         attention={data.attention}

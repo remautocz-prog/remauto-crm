@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 
-// Mirrors lib/dashboard/owner-attention.ts rules for regression checks.
+// Mirrors lib/dashboard/owner-attention.ts receivable rules.
+
+function calculateRemainingAmount(finalPrice, paidAmount) {
+  return Math.max(finalPrice - Math.max(paidAmount, 0), 0);
+}
+
+function isDetailingReceivableOrder(order) {
+  if (order.archived_at) return false;
+  if (order.status === "cancelled") return false;
+  if (order.final_price <= 0) return false;
+  return calculateRemainingAmount(order.final_price, order.paid_amount) > 0;
+}
+
+function isDetailingPartiallyPaidReceivable(order) {
+  if (!isDetailingReceivableOrder(order)) return false;
+  return order.paid_amount > 0;
+}
 
 function buildRows(input) {
   const today = input.today;
@@ -38,25 +54,18 @@ function buildRows(input) {
 
   for (const order of input.detailingOrders) {
     if (order.archived_at || order.status === "cancelled") continue;
-    if (order.status === "delivered" && order.payment_status === "unpaid") {
+
+    if (isDetailingReceivableOrder(order)) {
+      const partiallyPaid = isDetailingPartiallyPaidReceivable(order);
       items.push({
-        id: `detailing:${order.id}:detailing_unpaid`,
+        id: `detailing:${order.id}:${partiallyPaid ? "detailing_partially_paid" : "detailing_unpaid"}`,
         module: "detailing",
         entityId: order.id,
-        reasonCategory: "detailing_unpaid",
-        priority: "critical",
+        reasonCategory: partiallyPaid ? "detailing_partially_paid" : "detailing_unpaid",
+        priority: partiallyPaid ? "high" : "critical",
         sortTimestamp: order.updated_at,
       });
-    }
-    if (order.status === "delivered" && order.payment_status === "partially_paid") {
-      items.push({
-        id: `detailing:${order.id}:detailing_partially_paid`,
-        module: "detailing",
-        entityId: order.id,
-        reasonCategory: "detailing_partially_paid",
-        priority: "high",
-        sortTimestamp: order.updated_at,
-      });
+      continue;
     }
   }
 
@@ -99,15 +108,16 @@ check(
 );
 
 check(
-  "unpaid delivered detailing appears",
+  "in_progress unpaid detailing appears",
   buildRows({
     today,
     tasks: [],
     detailingOrders: [
       {
         id: "o1",
-        status: "delivered",
-        payment_status: "unpaid",
+        status: "in_progress",
+        final_price: 20_000,
+        paid_amount: 0,
         archived_at: null,
         updated_at: "2026-08-01",
       },
@@ -117,21 +127,79 @@ check(
 );
 
 check(
-  "partially paid order appears",
+  "unpaid delivered detailing appears",
+  buildRows({
+    today,
+    tasks: [],
+    detailingOrders: [
+      {
+        id: "o1",
+        status: "delivered",
+        final_price: 20_000,
+        paid_amount: 0,
+        archived_at: null,
+        updated_at: "2026-08-01",
+      },
+    ],
+    cars: [],
+  }).some((item) => item.reasonCategory === "detailing_unpaid")
+);
+
+check(
+  "partially paid order appears once",
   buildRows({
     today,
     tasks: [],
     detailingOrders: [
       {
         id: "o2",
-        status: "delivered",
-        payment_status: "partially_paid",
+        status: "ready",
+        final_price: 20_000,
+        paid_amount: 5_000,
+        archived_at: null,
+        updated_at: "2026-08-01",
+      },
+    ],
+    cars: [],
+  }).filter((item) => item.entityId === "o2").length === 1
+);
+
+check(
+  "partially paid order uses partially paid reason",
+  buildRows({
+    today,
+    tasks: [],
+    detailingOrders: [
+      {
+        id: "o2",
+        status: "ready",
+        final_price: 20_000,
+        paid_amount: 5_000,
         archived_at: null,
         updated_at: "2026-08-01",
       },
     ],
     cars: [],
   }).some((item) => item.reasonCategory === "detailing_partially_paid")
+);
+
+check(
+  "fully paid order does not appear",
+  !buildRows({
+    today,
+    tasks: [],
+    detailingOrders: [
+      {
+        id: "o3",
+        status: "delivered",
+        final_price: 20_000,
+        paid_amount: 20_000,
+        archived_at: null,
+        updated_at: "2026-08-01",
+      },
+    ],
+    cars: [],
+  }).some((item) => item.module === "detailing")
 );
 
 check(

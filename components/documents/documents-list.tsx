@@ -36,6 +36,12 @@ import { DocumentInlineDeadlineEditor } from "@/components/documents/document-in
 import { DocumentInlineStatusSelect, type DocumentListToast } from "@/components/documents/document-inline-status-select";
 import { DocumentArchivedBadge } from "@/components/documents/document-archived-badge";
 import { DocumentArchiveRestoreButton } from "@/components/documents/document-archive-restore-button";
+import { OrderArchiveRowActions } from "@/components/shared/order-archive-row-actions";
+import {
+  archiveDocumentTaskAction,
+  deleteDocumentTaskAction,
+  restoreDocumentTaskAction,
+} from "@/lib/actions/documents";
 import { DocumentStatusBadge } from "@/components/documents/document-status-badge";
 import { DOCUMENT_PRIORITY_ROW_ACCENT, normalizeDocumentPriority } from "@/lib/documents/priority-styles";
 import { Button } from "@/components/ui/button";
@@ -103,6 +109,7 @@ type DocumentsListProps = {
   showArchiveMetadata: boolean;
   canRestoreArchived: boolean;
   canArchive: boolean;
+  canPermanentlyDelete: boolean;
   initialClientId?: number | null;
   initialCarId?: number | null;
 };
@@ -532,6 +539,9 @@ export function DocumentsList(props: DocumentsListProps) {
                   {isArchivedView && props.canRestoreArchived ? (
                     <th className="px-4 py-3 font-medium">{t("restoreTask")}</th>
                   ) : null}
+                  {(props.canArchive || props.canPermanentlyDelete) ? (
+                    <th className="px-4 py-3 font-medium">{tActions("actions")}</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -643,6 +653,22 @@ export function DocumentsList(props: DocumentsListProps) {
                           <DocumentArchiveRestoreButton taskId={task.id} compact />
                         </td>
                       ) : null}
+                      {(props.canArchive || props.canPermanentlyDelete) ? (
+                        <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                          <OrderArchiveRowActions
+                            entityName={`#${task.id}`}
+                            isArchived={isArchivedView}
+                            canArchive={props.canArchive && !isArchivedView}
+                            canRestore={props.canRestoreArchived && isArchivedView}
+                            canPermanentlyDelete={props.canPermanentlyDelete && isArchivedView}
+                            onArchive={() => archiveDocumentTaskAction(task.id)}
+                            onRestore={() => restoreDocumentTaskAction(task.id)}
+                            onPermanentDelete={() => deleteDocumentTaskAction(task.id)}
+                            archiveLabel={t("archiveTask")}
+                            restoreLabel={t("restoreTask")}
+                          />
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
@@ -752,6 +778,20 @@ export function DocumentsList(props: DocumentsListProps) {
                         <DocumentQuickPayControl task={task} compact />
                       ) : props.canRestoreArchived ? (
                         <DocumentArchiveRestoreButton taskId={task.id} compact />
+                      ) : null}
+                      {(props.canArchive || props.canPermanentlyDelete) ? (
+                        <OrderArchiveRowActions
+                          entityName={`#${task.id}`}
+                          isArchived={isArchivedView}
+                          canArchive={props.canArchive && !isArchivedView}
+                          canRestore={props.canRestoreArchived && isArchivedView}
+                          canPermanentlyDelete={props.canPermanentlyDelete && isArchivedView}
+                          onArchive={() => archiveDocumentTaskAction(task.id)}
+                          onRestore={() => restoreDocumentTaskAction(task.id)}
+                          onPermanentDelete={() => deleteDocumentTaskAction(task.id)}
+                          archiveLabel={t("archiveTask")}
+                          restoreLabel={t("restoreTask")}
+                        />
                       ) : null}
                     </div>
                     <div className="flex justify-between gap-3">

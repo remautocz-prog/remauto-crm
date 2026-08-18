@@ -15,6 +15,7 @@ import {
 import { computeDocumentWorkloadSummary } from "@/lib/documents/summary";
 import { getPragueTodayDateString } from "@/lib/documents/deadline";
 import type { Car } from "@/lib/types/cars";
+import type { DetailingReceivablesSummary } from "@/lib/detailing/receivables";
 import type { OwnerTopCards } from "@/lib/types/owner-dashboard";
 import type { DocumentTaskWithRelations } from "@/lib/types/documents";
 
@@ -36,6 +37,7 @@ export function computeOwnerTopCards(input: {
   cars: Car[];
   tasks: DocumentTaskWithRelations[];
   detailingOrdersToday: number;
+  detailingReceivables: DetailingReceivablesSummary;
   attentionCount: number;
 }): OwnerTopCards {
   let carsInStock = 0;
@@ -68,6 +70,7 @@ export function computeOwnerTopCards(input: {
     commissionCarsInStock,
     documentsInProgress,
     detailingOrdersToday: input.detailingOrdersToday,
+    detailingReceivables: input.detailingReceivables,
     attentionCount: input.attentionCount,
   };
 }
